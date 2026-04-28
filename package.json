@@ -1,0 +1,27 @@
+{
+  "name": "bubby",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"node --watch server/index.js\" \"vite\"",
+    "dev:client": "vite",
+    "dev:server": "node --watch server/index.js",
+    "start": "node server/index.js",
+    "test": "node --test",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.82.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "vite": "^8.0.10"
+  }
+}

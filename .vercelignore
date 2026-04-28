@@ -1,0 +1,6 @@
+server/app.js
+server/index.js
+server/**/*.test.js
+design/
+qa-*.png
+*.test.js

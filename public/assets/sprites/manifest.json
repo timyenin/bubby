@@ -1,0 +1,282 @@
+{
+  "sprite_size": [
+    48,
+    48
+  ],
+  "background": "transparent",
+  "ink_rgba": [
+    0,
+    0,
+    0,
+    255
+  ],
+  "transparent_rgba": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "pixel_grid": "1:1, no antialiasing",
+  "frame_count": 23,
+  "animations": {
+    "idle": [
+      {
+        "file": "frames/idle_01.png",
+        "index": 1,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/idle_02.png",
+        "index": 2,
+        "size": [
+          48,
+          48
+        ]
+      }
+    ],
+    "idle_sheet": {
+      "file": "sheets/idle_sheet.png",
+      "size": [
+        96,
+        48
+      ]
+    },
+    "eating": [
+      {
+        "file": "frames/eating_01.png",
+        "index": 1,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/eating_02.png",
+        "index": 2,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/eating_03.png",
+        "index": 3,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/eating_04.png",
+        "index": 4,
+        "size": [
+          48,
+          48
+        ]
+      }
+    ],
+    "eating_sheet": {
+      "file": "sheets/eating_sheet.png",
+      "size": [
+        192,
+        48
+      ]
+    },
+    "happy_bounce": [
+      {
+        "file": "frames/happy_bounce_01.png",
+        "index": 1,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/happy_bounce_02.png",
+        "index": 2,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/happy_bounce_03.png",
+        "index": 3,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/happy_bounce_04.png",
+        "index": 4,
+        "size": [
+          48,
+          48
+        ]
+      }
+    ],
+    "happy_bounce_sheet": {
+      "file": "sheets/happy_bounce_sheet.png",
+      "size": [
+        192,
+        48
+      ]
+    },
+    "sleepy": [
+      {
+        "file": "frames/sleepy_01.png",
+        "index": 1,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/sleepy_02.png",
+        "index": 2,
+        "size": [
+          48,
+          48
+        ]
+      }
+    ],
+    "sleepy_sheet": {
+      "file": "sheets/sleepy_sheet.png",
+      "size": [
+        96,
+        48
+      ]
+    },
+    "sick": [
+      {
+        "file": "frames/sick_01.png",
+        "index": 1,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/sick_02.png",
+        "index": 2,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/sick_03.png",
+        "index": 3,
+        "size": [
+          48,
+          48
+        ]
+      }
+    ],
+    "sick_sheet": {
+      "file": "sheets/sick_sheet.png",
+      "size": [
+        144,
+        48
+      ]
+    },
+    "recovery": [
+      {
+        "file": "frames/recovery_01.png",
+        "index": 1,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/recovery_02.png",
+        "index": 2,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/recovery_03.png",
+        "index": 3,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/recovery_04.png",
+        "index": 4,
+        "size": [
+          48,
+          48
+        ]
+      }
+    ],
+    "recovery_sheet": {
+      "file": "sheets/recovery_sheet.png",
+      "size": [
+        192,
+        48
+      ]
+    },
+    "workout": [
+      {
+        "file": "frames/workout_01.png",
+        "index": 1,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/workout_02.png",
+        "index": 2,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/workout_03.png",
+        "index": 3,
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/workout_04.png",
+        "index": 4,
+        "size": [
+          48,
+          48
+        ]
+      }
+    ],
+    "workout_sheet": {
+      "file": "sheets/workout_sheet.png",
+      "size": [
+        192,
+        48
+      ]
+    }
+  },
+  "all_sheet": {
+    "file": "bubby_all_23_frames_sheet_transparent.png",
+    "size": [
+      1104,
+      48
+    ]
+  },
+  "preview_only": [
+    "bubby_all_23_frames_preview_8x_transparent.png",
+    "bubby_all_23_frames_checker_preview_8x.png",
+    "bubby_animation_contact_checker_preview_8x.png"
+  ]
+}
