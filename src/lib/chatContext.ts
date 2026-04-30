@@ -8,12 +8,14 @@ import {
   getBubbyState,
   getConversationHistory,
   getDailyLog,
+  getMemory,
   getPantry,
   getUserProfile,
   type BubbyState,
   type ConversationHistory,
   type DailyLog,
   type MacroTotals,
+  type MemoryEntry,
   type Pantry,
   type UserProfile,
 } from './storage.ts';
@@ -42,6 +44,7 @@ export interface ChatContext {
   bubby_state: BubbyState;
   concern_level: ConcernLevel;
   weight_loss_rate: WeightLossSignal;
+  memory: MemoryEntry[] | null;
   current_time: string;
   is_onboarding: boolean;
 }
@@ -194,6 +197,7 @@ export interface BuildChatContextOptions {
   dailyLog?: DailyLog | null;
   recentDailyLogs?: Array<DailyLog | null>;
   pantry?: Pantry | null;
+  memory?: MemoryEntry[] | null;
   conversationHistory?: ConversationHistory | null;
   bubbyState?: BubbyState | null;
   now?: Date;
@@ -205,6 +209,7 @@ export function buildChatContext({
   dailyLog = null,
   recentDailyLogs = [],
   pantry = null,
+  memory = null,
   conversationHistory = null,
   bubbyState = null,
   now = new Date(),
@@ -223,6 +228,7 @@ export function buildChatContext({
     bubby_state: bubbyState ?? defaultBubbyState(currentTime),
     concern_level: resolveConcernLevel(userProfile, recentDailyLogs),
     weight_loss_rate: resolveWeightLossRateSignal(recentDailyLogs),
+    memory,
     current_time: currentTime,
     is_onboarding: false,
   };
@@ -240,6 +246,7 @@ export function buildChatContextFromStorage({
     dailyLog: getDailyLog(dateString),
     recentDailyLogs,
     pantry: getPantry(),
+    memory: getMemory()?.entries ?? null,
     conversationHistory: getConversationHistory(),
     bubbyState: getBubbyState(),
     now,

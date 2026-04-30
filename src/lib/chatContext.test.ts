@@ -12,6 +12,7 @@ import {
   setBubbyState,
   setConversationHistory,
   setDailyLog,
+  setMemory,
   setPantry,
   setUserProfile,
 } from './storage.ts';
@@ -117,6 +118,7 @@ test('buildChatContext assembles the home chat payload shape', () => {
   assert.deepEqual(context.bubby_state, bubbyState);
   assert.equal(context.current_time, '2026-04-27T16:34:00.000Z');
   assert.equal(context.is_onboarding, false);
+  assert.equal(context.memory, null);
 });
 
 test('buildChatContextFromStorage reads localStorage and caps recent history at 20', () => {
@@ -160,6 +162,47 @@ test('buildChatContextFromStorage reads localStorage and caps recent history at 
     carbs_g: 12,
     fat_g: 3,
   });
+});
+
+test('buildChatContextFromStorage includes memory entries when memory exists in storage', () => {
+  setMemory({
+    entries: [
+      {
+        id: 'memory_1',
+        content: 'hates mushrooms',
+        category: 'preference',
+        created_at: '2026-04-27T08:00:00.000Z',
+        updated_at: '2026-04-27T08:00:00.000Z',
+      },
+    ],
+    last_updated: '2026-04-27T08:00:00.000Z',
+  });
+
+  const context = buildChatContextFromStorage({
+    dateString: '2026-04-27',
+    currentTime: '2026-04-27T16:34:00.000Z',
+    now: new Date('2026-04-27T16:34:00.000Z'),
+  });
+
+  assert.deepEqual(context.memory, [
+    {
+      id: 'memory_1',
+      content: 'hates mushrooms',
+      category: 'preference',
+      created_at: '2026-04-27T08:00:00.000Z',
+      updated_at: '2026-04-27T08:00:00.000Z',
+    },
+  ]);
+});
+
+test('buildChatContextFromStorage includes null memory when no memory in storage', () => {
+  const context = buildChatContextFromStorage({
+    dateString: '2026-04-27',
+    currentTime: '2026-04-27T16:34:00.000Z',
+    now: new Date('2026-04-27T16:34:00.000Z'),
+  });
+
+  assert.equal(context.memory, null);
 });
 
 test('buildChatContextFromStorage marks concern elevated after two consecutive sub-floor daily logs', () => {

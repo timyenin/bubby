@@ -18,6 +18,7 @@ const basePrompt = [
   'state: {{bubby_state}}',
   'concern: {{concern_level}}',
   'weight loss: {{weight_loss_rate}}',
+  'memory: {{memory}}',
   'time: {{current_time}}',
 ].join('\n');
 
@@ -39,6 +40,7 @@ test('renderSystemPrompt renders empty context fields as none yet', () => {
   assert.match(rendered, /training: \(none yet\)/);
   assert.match(rendered, /concern: \(none yet\)/);
   assert.match(rendered, /weight loss: \(none yet\)/);
+  assert.match(rendered, /memory: \(none yet\)/);
 });
 
 test('renderSystemPrompt JSON-stringifies populated context fields', () => {
@@ -51,6 +53,7 @@ test('renderSystemPrompt JSON-stringifies populated context fields', () => {
       recent_history: [{ role: 'user', content: 'hi' }],
       concern_level: 'elevated',
       weight_loss_rate: 'too_fast',
+      memory: [{ content: 'hates mushrooms', category: 'preference' }],
     },
     isOnboarding: false,
   });
@@ -60,6 +63,7 @@ test('renderSystemPrompt JSON-stringifies populated context fields', () => {
   assert.match(rendered, /history: \[\{"role":"user","content":"hi"\}\]/);
   assert.match(rendered, /concern: elevated/);
   assert.match(rendered, /weight loss: too_fast/);
+  assert.match(rendered, /memory: \[\{"content":"hates mushrooms","category":"preference"\}\]/);
 });
 
 test('renderSystemPrompt appends onboarding addendum in onboarding mode', () => {
@@ -70,6 +74,7 @@ test('renderSystemPrompt appends onboarding addendum in onboarding mode', () => 
     isOnboarding: true,
   });
 
+  assert.match(rendered, /memory: \(none yet\)/);
   assert.match(rendered, /time: \(none yet\)/);
   assert.match(rendered, /# you are in onboarding mode/);
 });

@@ -4,9 +4,18 @@ const PANTRY_KEY = `${KEY_PREFIX}pantry`;
 const BUBBY_STATE_KEY = `${KEY_PREFIX}bubby_state`;
 const CONVERSATION_HISTORY_KEY = `${KEY_PREFIX}conversation_history`;
 const ONBOARDING_COMPLETE_KEY = `${KEY_PREFIX}onboarding_complete`;
+const MEMORY_KEY = `${KEY_PREFIX}memory`;
 const MAX_HISTORY_MESSAGES = 100;
 
 export type VitalName = 'vitality' | 'mood' | 'strength' | 'energy';
+export type MemoryCategory =
+  | 'preference'
+  | 'rule'
+  | 'context'
+  | 'goal'
+  | 'health'
+  | 'schedule'
+  | 'other';
 
 const VITAL_BARS: VitalName[] = ['vitality', 'mood', 'strength', 'energy'];
 
@@ -54,10 +63,19 @@ export interface DailyLog {
   adherence_flags: string[];
 }
 
+export interface PantryItemMacros {
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  serving_size: string;
+}
+
 export interface PantryItem {
   name: string;
   category: string;
   always: boolean;
+  macros?: PantryItemMacros | null;
 }
 
 export interface Pantry {
@@ -85,6 +103,19 @@ export interface ChatMessage {
 
 export interface ConversationHistory {
   messages: ChatMessage[];
+}
+
+export interface MemoryEntry {
+  id: string;
+  content: string;
+  category: MemoryCategory;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BubbyMemory {
+  entries: MemoryEntry[];
+  last_updated: string;
 }
 
 function dailyLogKey(dateString: string): string {
@@ -119,6 +150,18 @@ function deleteKey(key: string): void {
 
 function clampVital(value: number): number {
   return Math.max(0, Math.min(100, value));
+}
+
+function timestampFrom(date = new Date()): string {
+  return date.toISOString();
+}
+
+function generateMemoryId(now: string): string {
+  return `memory_${now.replace(/[^0-9]/g, '')}_${Math.random().toString(36).slice(2)}`;
+}
+
+function normalizeMemoryContent(content: string): string {
+  return content.trim().replace(/\s+/g, ' ');
 }
 
 function emptyDailyLog(dateString: string): DailyLog {
@@ -223,6 +266,109 @@ export function setOnboardingComplete(isComplete: boolean): boolean {
 
 export function deleteOnboardingComplete(): void {
   deleteKey(ONBOARDING_COMPLETE_KEY);
+}
+
+export function getMemory(): BubbyMemory | null {
+  return getJson<BubbyMemory>(MEMORY_KEY);
+}
+
+export function setMemory(memory: BubbyMemory): BubbyMemory {
+  return setJson(MEMORY_KEY, memory);
+}
+
+export function deleteMemory(): void {
+  deleteKey(MEMORY_KEY);
+}
+
+export function addMemoryEntry(
+  entry: Omit<MemoryEntry, 'id' | 'created_at' | 'updated_at'>,
+): BubbyMemory {
+  const now = timestampFrom();
+  const content = normalizeMemoryContent(entry.content);
+  const memory = getMemory() ?? { entries: [], last_updated: '' };
+  const existingIndex = memory.entries.findIndex(
+    (existingEntry) => normalizeMemoryContent(existingEntry.content).toLowerCase() === content.toLowerCase(),
+  );
+
+  if (existingIndex >= 0) {
+    const entries = [...memory.entries];
+    entries[existingIndex] = {
+      ...entries[existingIndex],
+      content,
+      category: entry.category,
+      updated_at: now,
+    };
+    return setMemory({ entries, last_updated: now });
+  }
+
+  const nextEntry: MemoryEntry = {
+    id: generateMemoryId(now),
+    content,
+    category: entry.category,
+    created_at: now,
+    updated_at: now,
+  };
+
+  return setMemory({
+    entries: [...memory.entries, nextEntry],
+    last_updated: now,
+  });
+}
+
+export function removeMemoryEntry(id: string): BubbyMemory | null {
+  const memory = getMemory();
+  if (!memory) {
+    return null;
+  }
+
+  const entries = memory.entries.filter((entry) => entry.id !== id);
+  const now = timestampFrom();
+  return setMemory({ entries, last_updated: now });
+}
+
+export function removeMemoryByContent(content: string): BubbyMemory | null {
+  const memory = getMemory();
+  if (!memory) {
+    return null;
+  }
+
+  const normalizedContent = normalizeMemoryContent(content).toLowerCase();
+  const entries = memory.entries.filter(
+    (entry) => normalizeMemoryContent(entry.content).toLowerCase() !== normalizedContent,
+  );
+
+  if (entries.length === memory.entries.length) {
+    return null;
+  }
+
+  const now = timestampFrom();
+  return setMemory({ entries, last_updated: now });
+}
+
+export function updateMemoryEntry(
+  id: string,
+  updates: Partial<Pick<MemoryEntry, 'content' | 'category'>>,
+): BubbyMemory | null {
+  const memory = getMemory();
+  if (!memory) {
+    return null;
+  }
+
+  const entryIndex = memory.entries.findIndex((entry) => entry.id === id);
+  if (entryIndex < 0) {
+    return null;
+  }
+
+  const now = timestampFrom();
+  const entries = [...memory.entries];
+  entries[entryIndex] = {
+    ...entries[entryIndex],
+    ...(updates.content !== undefined ? { content: normalizeMemoryContent(updates.content) } : {}),
+    ...(updates.category !== undefined ? { category: updates.category } : {}),
+    updated_at: now,
+  };
+
+  return setMemory({ entries, last_updated: now });
 }
 
 /**

@@ -1,34 +1,49 @@
 import { todayString } from './dates.ts';
 import {
+  addMemoryEntry,
   getOrInitDailyLog,
   getPantry,
   getUserProfile,
+  removeMemoryByContent,
   setDailyLog,
   setPantry,
   setUserProfile,
   type DailyLog,
   type MacroTotals,
+  type MemoryCategory,
   type Meal,
   type Pantry,
+  type PantryItemMacros,
   type UserProfile,
 } from './storage.ts';
+
+type MacroActionPayload = Partial<Record<keyof MacroTotals, number | string>> & {
+  serving_size?: unknown;
+};
 
 export type ActionType =
   | 'log_meal'
   | 'log_weight'
   | 'set_workout_day'
   | 'update_pantry'
+  | 'update_pantry_macros'
   | 'update_rule'
   | 'update_macros'
+  | 'save_memory'
+  | 'forget_memory'
   | 'onboarding_complete';
 
 export interface ActionData {
   description?: string;
   date?: string;
-  macros?: Partial<Record<keyof MacroTotals, number | string>>;
+  macros?: MacroActionPayload;
   weight_lbs?: number | string;
   is_workout_day?: boolean;
   training_type?: string;
+  item_name?: string;
+  content?: string;
+  category?: MemoryCategory | string;
+  memory_content?: string;
   added?: unknown[];
   removed?: unknown[];
   add?: unknown[];
@@ -51,6 +66,15 @@ export interface ApplyActionOptions {
 
 const ACTION_PATTERN = /\[ACTION\]([\s\S]*?)\[\/ACTION\]/g;
 const MACRO_KEYS: Array<keyof MacroTotals> = ['calories', 'protein_g', 'carbs_g', 'fat_g'];
+const MEMORY_CATEGORIES: MemoryCategory[] = [
+  'preference',
+  'rule',
+  'context',
+  'goal',
+  'health',
+  'schedule',
+  'other',
+];
 
 function timestampFrom(now: Date | string | number): string {
   return now instanceof Date ? now.toISOString() : new Date(now).toISOString();
@@ -113,6 +137,30 @@ function normalizeMacroUpdates(macros: ActionData['rest_day'] = {}): Partial<Mac
 
     return updates;
   }, {});
+}
+
+function normalizeMemoryCategory(category: unknown): MemoryCategory {
+  return MEMORY_CATEGORIES.includes(category as MemoryCategory)
+    ? (category as MemoryCategory)
+    : 'other';
+}
+
+function normalizePantryItemMacros(macros: ActionData['macros']): PantryItemMacros | null {
+  if (!macros || typeof macros !== 'object') {
+    return null;
+  }
+
+  const normalizedMacros = normalizeMacros(macros);
+  const servingSize = String(macros.serving_size ?? '').trim();
+
+  if (!servingSize) {
+    return null;
+  }
+
+  return {
+    ...normalizedMacros,
+    serving_size: servingSize,
+  };
 }
 
 function sumMealTotals(meals: Meal[]): MacroTotals {
@@ -220,6 +268,43 @@ function applyUpdatePantry(
   });
 }
 
+function applyUpdatePantryMacros(
+  action: ParsedAction,
+  { now = new Date() }: ApplyActionOptions = {},
+): Pantry | null {
+  const itemName = String(action.data?.item_name ?? '').trim();
+  const macros = normalizePantryItemMacros(action.data?.macros);
+  if (!itemName || !macros) {
+    return null;
+  }
+
+  const pantry: Pantry = getPantry() ?? { items: [], last_updated: '' };
+  const itemIndex = (pantry.items ?? []).findIndex(
+    (item) => item.name.toLowerCase() === itemName.toLowerCase(),
+  );
+  const items = [...(pantry.items ?? [])];
+
+  if (itemIndex >= 0) {
+    items[itemIndex] = {
+      ...items[itemIndex],
+      macros,
+    };
+  } else {
+    items.push({
+      name: itemName,
+      category: 'unsorted',
+      always: true,
+      macros,
+    });
+  }
+
+  return setPantry({
+    ...pantry,
+    items,
+    last_updated: timestampFrom(now),
+  });
+}
+
 function emptyMacros(): MacroTotals {
   return { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
 }
@@ -280,6 +365,27 @@ function applyUpdateMacros(action: ParsedAction): UserProfile | null {
   return setUserProfile(nextProfile);
 }
 
+function applySaveMemory(action: ParsedAction): unknown {
+  const content = String(action.data?.content ?? '').trim();
+  if (!content) {
+    return null;
+  }
+
+  return addMemoryEntry({
+    content,
+    category: normalizeMemoryCategory(action.data?.category),
+  });
+}
+
+function applyForgetMemory(action: ParsedAction): unknown {
+  const memoryContent = String(action.data?.memory_content ?? '').trim();
+  if (!memoryContent) {
+    return null;
+  }
+
+  return removeMemoryByContent(memoryContent);
+}
+
 function isActionShape(value: unknown): value is { type: unknown; data?: unknown } {
   return typeof value === 'object' && value !== null && 'type' in value;
 }
@@ -313,10 +419,16 @@ export function applyAction(
       return applySetWorkoutDay(action, options);
     case 'update_pantry':
       return applyUpdatePantry(action, options);
+    case 'update_pantry_macros':
+      return applyUpdatePantryMacros(action, options);
     case 'update_rule':
       return applyUpdateRule(action);
     case 'update_macros':
       return applyUpdateMacros(action);
+    case 'save_memory':
+      return applySaveMemory(action);
+    case 'forget_memory':
+      return applyForgetMemory(action);
     case 'onboarding_complete':
       return null;
     default:

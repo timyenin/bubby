@@ -8,11 +8,14 @@ import {
   parseActions,
 } from './actions.ts';
 import {
+  addMemoryEntry,
   clearAll,
   getDailyLog,
+  getMemory,
   getPantry,
   getUserProfile,
   setDailyLog,
+  setMemory,
   setPantry,
   setUserProfile,
 } from './storage.ts';
@@ -216,6 +219,97 @@ test('update_pantry adds and removes pantry items without duplicates', () => {
   );
 });
 
+test('update_pantry_macros updates macros on an existing pantry item', () => {
+  setPantry({
+    items: [{ name: 'chicken breast', category: 'protein', always: true }],
+    last_updated: '2026-04-27T08:00:00.000Z',
+  });
+
+  applyAction(
+    {
+      type: 'update_pantry_macros',
+      data: {
+        item_name: 'chicken breast',
+        macros: {
+          calories: 165,
+          protein_g: 31,
+          carbs_g: 0,
+          fat_g: 3.6,
+          serving_size: '6oz',
+        },
+      },
+    },
+    { now: new Date('2026-04-27T12:00:00.000Z') },
+  );
+
+  assert.deepEqual(getPantry().items[0].macros, {
+    calories: 165,
+    protein_g: 31,
+    carbs_g: 0,
+    fat_g: 3.6,
+    serving_size: '6oz',
+  });
+});
+
+test("update_pantry_macros adds a new pantry item with macros if it doesn't exist", () => {
+  setPantry({
+    items: [],
+    last_updated: '2026-04-27T08:00:00.000Z',
+  });
+
+  applyAction({
+    type: 'update_pantry_macros',
+    data: {
+      item_name: 'chicken breast',
+      macros: {
+        calories: 165,
+        protein_g: 31,
+        carbs_g: 0,
+        fat_g: 3.6,
+        serving_size: '6oz',
+      },
+    },
+  });
+
+  assert.deepEqual(getPantry().items[0], {
+    name: 'chicken breast',
+    category: 'unsorted',
+    always: true,
+    macros: {
+      calories: 165,
+      protein_g: 31,
+      carbs_g: 0,
+      fat_g: 3.6,
+      serving_size: '6oz',
+    },
+  });
+});
+
+test('update_pantry_macros matches item name case-insensitively', () => {
+  setPantry({
+    items: [{ name: 'Chicken Breast', category: 'protein', always: true }],
+    last_updated: '2026-04-27T08:00:00.000Z',
+  });
+
+  applyAction({
+    type: 'update_pantry_macros',
+    data: {
+      item_name: 'chicken breast',
+      macros: {
+        calories: 165,
+        protein_g: 31,
+        carbs_g: 0,
+        fat_g: 3.6,
+        serving_size: '6oz',
+      },
+    },
+  });
+
+  assert.equal(getPantry().items.length, 1);
+  assert.equal(getPantry().items[0].name, 'Chicken Breast');
+  assert.equal(getPantry().items[0].macros.protein_g, 31);
+});
+
 test('update_rule adds and removes established rules without duplicates', () => {
   setUserProfile({
     name: 'Tim',
@@ -296,6 +390,72 @@ test('update_macros without a profile in storage returns null', () => {
 
   assert.equal(result, null);
   assert.equal(getUserProfile(), null);
+});
+
+test('save_memory action adds an entry to memory storage', () => {
+  applyAction({
+    type: 'save_memory',
+    data: {
+      content: 'hates mushrooms',
+      category: 'preference',
+    },
+  });
+
+  assert.equal(getMemory().entries.length, 1);
+  assert.equal(getMemory().entries[0].content, 'hates mushrooms');
+  assert.equal(getMemory().entries[0].category, 'preference');
+});
+
+test('save_memory with duplicate content updates updated_at instead of adding', () => {
+  setMemory({
+    entries: [
+      {
+        id: 'memory_existing',
+        content: 'hates mushrooms',
+        category: 'preference',
+        created_at: '2026-04-27T08:00:00.000Z',
+        updated_at: '2026-04-27T08:00:00.000Z',
+      },
+    ],
+    last_updated: '2026-04-27T08:00:00.000Z',
+  });
+
+  applyAction({
+    type: 'save_memory',
+    data: {
+      content: ' HATES MUSHROOMS ',
+      category: 'rule',
+    },
+  });
+
+  assert.equal(getMemory().entries.length, 1);
+  assert.equal(getMemory().entries[0].id, 'memory_existing');
+  assert.equal(getMemory().entries[0].content, 'HATES MUSHROOMS');
+  assert.equal(getMemory().entries[0].category, 'rule');
+  assert.notEqual(getMemory().entries[0].updated_at, '2026-04-27T08:00:00.000Z');
+});
+
+test('forget_memory action removes a matching entry', () => {
+  addMemoryEntry({ content: 'hates mushrooms', category: 'preference' });
+
+  applyAction({
+    type: 'forget_memory',
+    data: { memory_content: 'HATES MUSHROOMS' },
+  });
+
+  assert.equal(getMemory().entries.length, 0);
+});
+
+test("forget_memory with no match does nothing and doesn't error", () => {
+  addMemoryEntry({ content: 'likes rice', category: 'preference' });
+
+  const result = applyAction({
+    type: 'forget_memory',
+    data: { memory_content: 'hates mushrooms' },
+  });
+
+  assert.equal(result, null);
+  assert.equal(getMemory().entries.length, 1);
 });
 
 test('applyActions is idempotent for set-like updates and log_meal is intentionally additive', () => {

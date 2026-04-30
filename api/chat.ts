@@ -17,6 +17,7 @@ const CONTEXT_PLACEHOLDERS = [
   'bubby_state',
   'concern_level',
   'weight_loss_rate',
+  'memory',
   'current_time',
 ] as const;
 
@@ -67,6 +68,7 @@ export interface ChatContextPayload {
   bubby_state?: unknown;
   concern_level?: unknown;
   weight_loss_rate?: unknown;
+  memory?: unknown;
   current_time?: unknown;
   is_onboarding?: boolean;
   [key: string]: unknown;
