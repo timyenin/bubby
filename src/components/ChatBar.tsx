@@ -126,7 +126,6 @@ function ChatBar({
         className="chat-file-input"
         type="file"
         accept="image/*"
-        capture="environment"
         disabled={!canAttach}
         tabIndex={-1}
         onChange={handleAttachmentChange}
