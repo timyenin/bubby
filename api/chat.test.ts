@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createVercelChatHandler } from './chat.ts';
+import defaultChatHandler, { createVercelChatHandler } from './chat.ts';
 
 function createMockResponse() {
   return {
@@ -105,6 +105,26 @@ test('vercel chat handler returns 405 for GET without loading prompts', async ()
   assert.equal(response.statusCode, 405);
   assert.deepEqual(response.json(), { error: 'method not allowed' });
   assert.equal(promptLoaderWasCalled, false);
+});
+
+test('default vercel chat handler returns 405 for GET without runtime env', async () => {
+  const previousApiKey = process.env.ANTHROPIC_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
+
+  try {
+    const response = createMockResponse();
+
+    await defaultChatHandler({ method: 'GET' }, response);
+
+    assert.equal(response.statusCode, 405);
+    assert.deepEqual(response.json(), { error: 'method not allowed' });
+  } finally {
+    if (previousApiKey === undefined) {
+      delete process.env.ANTHROPIC_API_KEY;
+    } else {
+      process.env.ANTHROPIC_API_KEY = previousApiKey;
+    }
+  }
 });
 
 test('vercel chat handler lazily loads prompts for valid POST requests', async () => {

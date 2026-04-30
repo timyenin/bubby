@@ -1,21 +1,116 @@
 import 'dotenv/config';
 import { Buffer } from 'node:buffer';
+import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import path from 'node:path';
 
-import { createClaudeClient, type ClaudeClient, type ClaudeMessageBlock } from '../server/claude.ts';
-import {
-  buildUserContent,
-  loadPrompts as loadPromptFiles,
-  renderSystemPrompt,
-  type ChatContextPayload,
-  type Prompts,
-} from '../server/routes/chat.ts';
-
+const MODEL = 'claude-sonnet-4-6';
+const MAX_TOKENS = 1900;
 const MAX_BODY_BYTES = Math.floor(4.5 * 1024 * 1024);
+const CONTEXT_PLACEHOLDERS = [
+  'user_profile',
+  'macros_today',
+  'macros_remaining',
+  'training_today',
+  'pantry',
+  'recent_history',
+  'bubby_state',
+  'concern_level',
+  'weight_loss_rate',
+  'current_time',
+] as const;
+
+interface TextContentPart {
+  type: 'text';
+  text: string;
+}
+
+type ContentPart = TextContentPart | { type: string; [key: string]: unknown };
+
+export interface ClaudeUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  [key: string]: unknown;
+}
+
+export interface ClaudeMessageBlock {
+  role: 'user' | 'assistant';
+  content: unknown;
+}
+
+export interface CreateMessageParams {
+  system?: string;
+  messages: ClaudeMessageBlock[];
+}
+
+export interface CreateMessageResult {
+  reply: string;
+  raw_usage: ClaudeUsage | null;
+}
+
+export interface ClaudeClient {
+  createMessage(params: CreateMessageParams): Promise<CreateMessageResult>;
+}
+
+export interface Prompts {
+  basePrompt: string;
+  onboardingPrompt: string;
+}
+
+export interface ChatContextPayload {
+  user_profile?: unknown;
+  macros_today?: unknown;
+  macros_remaining?: unknown;
+  training_today?: unknown;
+  pantry?: unknown;
+  recent_history?: unknown;
+  bubby_state?: unknown;
+  concern_level?: unknown;
+  weight_loss_rate?: unknown;
+  current_time?: unknown;
+  is_onboarding?: boolean;
+  [key: string]: unknown;
+}
+
+export interface RenderSystemPromptParams {
+  basePrompt: string;
+  onboardingPrompt: string;
+  context?: ChatContextPayload;
+  isOnboarding?: boolean;
+}
+
+interface ImagePayloadObject {
+  data: string;
+  media_type: string;
+}
+
+type ImagePayload = string | ImagePayloadObject | null | undefined;
+
+interface ParsedImage {
+  mediaType: string;
+  data: string;
+}
+
+interface UserContentImageBlock {
+  type: 'image';
+  source: { type: 'base64'; media_type: string; data: string };
+}
+
+interface UserContentTextBlock {
+  type: 'text';
+  text: string;
+}
+
+type UserContent = string | Array<UserContentImageBlock | UserContentTextBlock>;
+
+interface BuildUserContentParams {
+  message: string;
+  image?: ImagePayload;
+}
 
 interface VercelRequestBody {
   message?: string;
-  image?: unknown;
+  image?: ImagePayload;
   context?: ChatContextPayload;
   is_onboarding?: boolean;
 }
@@ -38,6 +133,168 @@ export type VercelChatHandler = (
   request: VercelLikeRequest,
   response: ServerResponse,
 ) => Promise<void>;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Object.prototype.toString.call(value) === '[object Object]';
+}
+
+function isEmptyContextValue(value: unknown): boolean {
+  if (value === null || value === undefined) {
+    return true;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim() === '';
+  }
+
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  }
+
+  if (isPlainObject(value)) {
+    return Object.keys(value).length === 0;
+  }
+
+  return false;
+}
+
+function renderContextValue(value: unknown): string {
+  if (isEmptyContextValue(value)) {
+    return '(none yet)';
+  }
+
+  return typeof value === 'string' ? value : JSON.stringify(value);
+}
+
+function parseDataUrl(dataUrl: string): ParsedImage {
+  const match = /^data:([^;,]+);base64,(.+)$/s.exec(dataUrl);
+  if (!match) {
+    throw new Error('image must be a base64 data URL');
+  }
+
+  return {
+    mediaType: match[1],
+    data: match[2],
+  };
+}
+
+function parseImagePayload(image: ImagePayload): ParsedImage {
+  if (typeof image === 'string') {
+    return parseDataUrl(image);
+  }
+
+  if (
+    image &&
+    typeof image === 'object' &&
+    typeof image.data === 'string' &&
+    typeof image.media_type === 'string'
+  ) {
+    const dataUrlMatch = /^data:([^;,]+);base64,(.+)$/s.exec(image.data);
+
+    return {
+      mediaType: dataUrlMatch?.[1] ?? image.media_type,
+      data: dataUrlMatch?.[2] ?? image.data,
+    };
+  }
+
+  throw new Error('image must include base64 data and media_type');
+}
+
+function collectTextContent(content: unknown): string {
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  if (!Array.isArray(content)) {
+    return '';
+  }
+
+  return (content as ContentPart[])
+    .filter((part): part is TextContentPart => part.type === 'text' && typeof part.text === 'string')
+    .map((part) => part.text)
+    .join('');
+}
+
+export function createClaudeClient(): ClaudeClient {
+  return {
+    async createMessage({ system, messages }: CreateMessageParams): Promise<CreateMessageResult> {
+      if (!process.env.ANTHROPIC_API_KEY) {
+        throw new Error('ANTHROPIC_API_KEY is not configured');
+      }
+
+      const { default: Anthropic } = await import('@anthropic-ai/sdk');
+      const anthropic = new Anthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY,
+      });
+      const response = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        system,
+        messages: messages as Parameters<typeof anthropic.messages.create>[0]['messages'],
+      });
+
+      return {
+        reply: collectTextContent(response.content),
+        raw_usage: (response.usage ?? null) as unknown as ClaudeUsage | null,
+      };
+    },
+  };
+}
+
+function readPromptFile(fileName: string): string {
+  const promptUrl = new URL(`../server/prompts/${fileName}`, import.meta.url);
+
+  try {
+    return fs.readFileSync(promptUrl, 'utf8');
+  } catch {
+    return fs.readFileSync(path.join(process.cwd(), 'server', 'prompts', fileName), 'utf8');
+  }
+}
+
+export function loadPrompts(): Prompts {
+  return {
+    basePrompt: readPromptFile('bubby_base.md'),
+    onboardingPrompt: readPromptFile('onboarding.md'),
+  };
+}
+
+export function renderSystemPrompt({
+  basePrompt,
+  onboardingPrompt,
+  context = {},
+  isOnboarding = false,
+}: RenderSystemPromptParams): string {
+  let rendered = basePrompt;
+
+  for (const key of CONTEXT_PLACEHOLDERS) {
+    rendered = rendered.replaceAll(`{{${key}}}`, renderContextValue(context[key]));
+  }
+
+  if (isOnboarding) {
+    return `${rendered.trimEnd()}\n\n${onboardingPrompt.trim()}`;
+  }
+
+  return rendered;
+}
+
+export function buildUserContent({ message, image }: BuildUserContentParams): UserContent {
+  if (!image) {
+    return message;
+  }
+
+  const { mediaType, data } = parseImagePayload(image);
+  return [
+    {
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: mediaType,
+        data,
+      },
+    },
+    { type: 'text', text: message || 'user sent a photo with no caption.' },
+  ];
+}
 
 function normalizeHistory(
   recentHistory: unknown,
@@ -114,7 +371,7 @@ async function readRequestBody(request: VercelLikeRequest): Promise<VercelReques
 export function createVercelChatHandler({
   claudeClient = createClaudeClient(),
   prompts,
-  loadPrompts = loadPromptFiles,
+  loadPrompts: loadPromptFiles = loadPrompts,
 }: CreateVercelChatHandlerOptions = {}): VercelChatHandler {
   return async function chatHandler(request, response) {
     if (request.method && request.method !== 'POST') {
@@ -146,7 +403,7 @@ export function createVercelChatHandler({
     let resolvedPrompts: Prompts;
 
     try {
-      resolvedPrompts = prompts ?? loadPrompts();
+      resolvedPrompts = prompts ?? loadPromptFiles();
     } catch (error) {
       console.error('Claude Vercel chat function failed to load prompts:', error);
       sendJson(response, 500, { error: 'Claude API request failed' });
@@ -159,10 +416,10 @@ export function createVercelChatHandler({
       context,
       isOnboarding,
     });
-    let userContent: ReturnType<typeof buildUserContent>;
+    let userContent: UserContent;
 
     try {
-      userContent = buildUserContent({ message, image: image as Parameters<typeof buildUserContent>[0]['image'] });
+      userContent = buildUserContent({ message, image });
     } catch {
       sendJson(response, 400, { error: 'valid image is required' });
       return;
