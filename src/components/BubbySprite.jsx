@@ -5,8 +5,8 @@ import {
   getIdleFrameDelayMs,
   getNextIdleFrameIndex,
   getSpriteBackgroundPositionPercent,
-} from '../lib/idleAnimation.js';
-import { loadSpriteManifest, resolveAnimationSheet } from '../lib/spriteManifest.js';
+} from '../lib/idleAnimation.ts';
+import { loadSpriteManifest, resolveAnimationSheet } from '../lib/spriteManifest.ts';
 
 const IDLE_ANIMATION = 'idle';
 const SPRITE_NATIVE_SCALE = 4;

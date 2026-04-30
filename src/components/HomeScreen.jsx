@@ -8,18 +8,18 @@ import {
   applyActions,
   parseActions,
   stripActionEnvelopes,
-} from '../lib/actions.js';
+} from '../lib/actions.ts';
 import {
   actionsToReactiveAnimations,
   createAnimationState,
   enqueueReactiveAnimations,
   finishCurrentAnimation,
   syncBaseAnimation,
-} from '../lib/animationState.js';
-import { buildChatContextFromStorage } from '../lib/chatContext.js';
+} from '../lib/animationState.ts';
+import { buildChatContextFromStorage } from '../lib/chatContext.ts';
 import { todayString } from '../lib/dates.js';
-import { processImageForUpload } from '../lib/imageProcessing.js';
-import { ONBOARDING_HOME_CLOSING_LINE } from '../lib/onboarding.js';
+import { processImageForUpload } from '../lib/imageProcessing.ts';
+import { ONBOARDING_HOME_CLOSING_LINE } from '../lib/onboarding.ts';
 import {
   appendMessageToHistory,
   getBubbyState,
@@ -27,11 +27,11 @@ import {
   getDailyLog,
   getUserProfile,
   setBubbyState,
-} from '../lib/storage.js';
+} from '../lib/storage.ts';
 import {
   applyActionsVitalEffects,
   applyVitalDecay,
-} from '../lib/vitalDecay.js';
+} from '../lib/vitalDecay.ts';
 
 function dataUrlToBase64(dataUrl) {
   return dataUrl.replace(/^data:[^;,]+;base64,/s, '');

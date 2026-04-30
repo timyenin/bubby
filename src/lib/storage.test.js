@@ -15,7 +15,7 @@ import {
   setDailyLog,
   setOnboardingComplete,
   setUserProfile,
-} from './storage.js';
+} from './storage.ts';
 
 class MemoryStorage {
   #items = new Map();

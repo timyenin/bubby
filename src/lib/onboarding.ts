@@ -2,9 +2,12 @@ import {
   calculateBMR,
   calculateCalorieFloor,
   calculateMacroTargets,
-} from './macros.js';
-import { todayString } from './dates.js';
-import { parseActions, stripActionEnvelopes } from './actions.js';
+  type ActivityLevel,
+  type MacroTargets,
+} from './macros.ts';
+import { todayString } from './dates.ts';
+import { parseActions, stripActionEnvelopes } from './actions.ts';
+import type { Pantry, UserProfile } from './storage.ts';
 
 export { parseActions, stripActionEnvelopes };
 
@@ -13,7 +16,38 @@ export const ONBOARDING_OPENING_LINE =
 export const ONBOARDING_HOME_CLOSING_LINE =
   "this is just my first guess. tell me when something's off and i'll adjust.";
 
-function resolveActivityFactor(activityLevel) {
+export type OnboardingRoute = 'home' | 'onboarding';
+
+export interface OnboardingProfileData {
+  name?: string;
+  preferred_name?: string | null;
+  age: number;
+  height_inches: number;
+  current_weight_lbs: number;
+  goal?: string;
+  activity_level?: string;
+  training_schedule?: Record<string, string> | null;
+  pantry_items?: unknown[];
+  established_rules?: unknown[];
+  work_food_access?: string;
+}
+
+export interface OnboardingCompleteData {
+  profile?: OnboardingProfileData;
+  [key: string]: unknown;
+}
+
+export interface OnboardingPlan {
+  profile: UserProfile;
+  pantry: Pantry;
+  reveal: {
+    rest_day: MacroTargets;
+    workout_day: MacroTargets;
+    calorie_floor: number;
+  };
+}
+
+function resolveActivityFactor(activityLevel: unknown): ActivityLevel {
   const normalized = String(activityLevel ?? '').toLowerCase();
 
   if (normalized.includes('active') || normalized.includes('restaurant')) {
@@ -27,15 +61,21 @@ function resolveActivityFactor(activityLevel) {
   return 'moderate';
 }
 
-function normalizeTrainingSchedule(trainingSchedule) {
-  if (trainingSchedule && typeof trainingSchedule === 'object' && !Array.isArray(trainingSchedule)) {
-    return trainingSchedule;
+function normalizeTrainingSchedule(
+  trainingSchedule: unknown,
+): Record<string, string> {
+  if (
+    trainingSchedule &&
+    typeof trainingSchedule === 'object' &&
+    !Array.isArray(trainingSchedule)
+  ) {
+    return trainingSchedule as Record<string, string>;
   }
 
   return {};
 }
 
-function normalizeArray(value) {
+function normalizeArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -43,22 +83,24 @@ function normalizeArray(value) {
   return value.filter(Boolean).map(String);
 }
 
-export function parseOnboardingCompleteAction(reply) {
+export function parseOnboardingCompleteAction(reply: string): OnboardingCompleteData | null {
   for (const action of parseActions(reply)) {
-
     if (action?.type === 'onboarding_complete' && action.data?.profile) {
-      return action.data;
+      return action.data as OnboardingCompleteData;
     }
   }
 
   return null;
 }
 
-export function getOnboardingRoute(isOnboardingComplete) {
+export function getOnboardingRoute(isOnboardingComplete: boolean): OnboardingRoute {
   return isOnboardingComplete === true ? 'home' : 'onboarding';
 }
 
-export function buildOnboardingPlan(profileData, now = todayString()) {
+export function buildOnboardingPlan(
+  profileData: OnboardingProfileData,
+  now: string = todayString(),
+): OnboardingPlan {
   const activityFactor = resolveActivityFactor(profileData.activity_level);
   const restDay = calculateMacroTargets({
     weightLbs: profileData.current_weight_lbs,
@@ -83,7 +125,7 @@ export function buildOnboardingPlan(profileData, now = todayString()) {
   const pantryItems = normalizeArray(profileData.pantry_items);
   const establishedRules = normalizeArray(profileData.established_rules);
 
-  const profile = {
+  const profile: UserProfile = {
     name: profileData.name ?? '',
     preferred_name: profileData.preferred_name ?? null,
     age: profileData.age,
@@ -104,7 +146,7 @@ export function buildOnboardingPlan(profileData, now = todayString()) {
     last_recalibration_weight: profileData.current_weight_lbs,
   };
 
-  const pantry = {
+  const pantry: Pantry = {
     items: pantryItems.map((name) => ({
       name,
       category: 'unsorted',

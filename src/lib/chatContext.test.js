@@ -5,7 +5,7 @@ import {
   buildChatContext,
   buildChatContextFromStorage,
   calculateMacrosRemaining,
-} from './chatContext.js';
+} from './chatContext.ts';
 import {
   clearAll,
   setBubbyState,
@@ -13,7 +13,7 @@ import {
   setDailyLog,
   setPantry,
   setUserProfile,
-} from './storage.js';
+} from './storage.ts';
 
 class MemoryStorage {
   #items = new Map();

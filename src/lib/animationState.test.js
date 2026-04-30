@@ -7,7 +7,7 @@ import {
   enqueueReactiveAnimations,
   finishCurrentAnimation,
   syncBaseAnimation,
-} from './animationState.js';
+} from './animationState.ts';
 
 const profile = {
   macro_targets: {

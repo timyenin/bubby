@@ -5,7 +5,48 @@ const FULL_IMAGE_QUALITY = 0.8;
 const THUMBNAIL_MAX_EDGE = 96;
 const THUMBNAIL_QUALITY = 0.6;
 
-function validateImageFile(file) {
+export interface ProcessedImage {
+  fullImage: string;
+  thumbnail: string;
+  mediaType: string;
+}
+
+interface ImageLike {
+  width?: number;
+  height?: number;
+  naturalWidth?: number;
+  naturalHeight?: number;
+}
+
+interface CanvasContextLike {
+  fillStyle: string;
+  fillRect: (x: number, y: number, w: number, h: number) => void;
+  drawImage: (image: unknown, x: number, y: number, w: number, h: number) => void;
+}
+
+interface CanvasLike {
+  width: number;
+  height: number;
+  getContext: (type: '2d') => CanvasContextLike | null;
+  toDataURL: (mediaType: string, quality?: number) => string;
+}
+
+export interface ProcessImageOptions {
+  loadImage?: (file: FileLike) => Promise<ImageLike>;
+  createCanvasElement?: () => CanvasLike;
+  fullMaxEdge?: number;
+  fullQuality?: number;
+  thumbnailMaxEdge?: number;
+  thumbnailQuality?: number;
+}
+
+interface FileLike {
+  type?: string;
+  size?: number | string;
+  name?: string;
+}
+
+function validateImageFile(file: FileLike | null | undefined): asserts file is FileLike {
   if (!file || typeof file.type !== 'string' || !file.type.startsWith('image/')) {
     throw new Error('Please choose an image file.');
   }
@@ -15,14 +56,18 @@ function validateImageFile(file) {
   }
 }
 
-function getImageDimensions(image) {
+function getImageDimensions(image: ImageLike): { width: number; height: number } {
   return {
-    width: image.naturalWidth ?? image.width,
-    height: image.naturalHeight ?? image.height,
+    width: image.naturalWidth ?? image.width ?? 0,
+    height: image.naturalHeight ?? image.height ?? 0,
   };
 }
 
-function getResizedDimensions(width, height, maxEdge) {
+function getResizedDimensions(
+  width: number,
+  height: number,
+  maxEdge: number,
+): { width: number; height: number } {
   const longestEdge = Math.max(width, height);
   if (longestEdge <= maxEdge) {
     return { width, height };
@@ -35,24 +80,24 @@ function getResizedDimensions(width, height, maxEdge) {
   };
 }
 
-function createCanvasElement() {
-  return document.createElement('canvas');
+function createCanvasElement(): CanvasLike {
+  return document.createElement('canvas') as unknown as CanvasLike;
 }
 
-function readFileAsDataUrl(file) {
+function readFileAsDataUrl(file: FileLike): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
-    reader.addEventListener('load', () => resolve(reader.result));
+    reader.addEventListener('load', () => resolve(reader.result as string));
     reader.addEventListener('error', () => reject(new Error('Could not read image file.')));
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(file as unknown as Blob);
   });
 }
 
-async function loadImageFromFile(file) {
+async function loadImageFromFile(file: FileLike): Promise<ImageLike> {
   const dataUrl = await readFileAsDataUrl(file);
 
-  return new Promise((resolve, reject) => {
+  return new Promise<ImageLike>((resolve, reject) => {
     const image = new Image();
 
     image.addEventListener('load', () => resolve(image));
@@ -61,7 +106,14 @@ async function loadImageFromFile(file) {
   });
 }
 
-function renderImageToDataUrl(image, { maxEdge, quality, createCanvasElement: createCanvas }) {
+function renderImageToDataUrl(
+  image: ImageLike,
+  {
+    maxEdge,
+    quality,
+    createCanvasElement: createCanvas,
+  }: { maxEdge: number; quality: number; createCanvasElement: () => CanvasLike },
+): string {
   const { width, height } = getImageDimensions(image);
   const resized = getResizedDimensions(width, height, maxEdge);
   const canvas = createCanvas();
@@ -82,12 +134,11 @@ function renderImageToDataUrl(image, { maxEdge, quality, createCanvasElement: cr
 
 /**
  * Resize and compress a user-selected image for Claude upload and chat history.
- *
- * @param {File} file
- * @param {object} [options]
- * @returns {Promise<{fullImage: string, thumbnail: string, mediaType: string}>}
  */
-export async function processImageForUpload(file, options = {}) {
+export async function processImageForUpload(
+  file: FileLike,
+  options: ProcessImageOptions = {},
+): Promise<ProcessedImage> {
   validateImageFile(file);
 
   const loadImage = options.loadImage ?? loadImageFromFile;

@@ -1,4 +1,4 @@
-import { todayString } from './dates.js';
+import { todayString } from './dates.ts';
 import {
   getOrInitDailyLog,
   getPantry,
@@ -6,47 +6,53 @@ import {
   setDailyLog,
   setPantry,
   setUserProfile,
-} from './storage.js';
+  type DailyLog,
+  type MacroTotals,
+  type Meal,
+  type Pantry,
+  type UserProfile,
+} from './storage.ts';
 
-/**
- * Supported action envelopes:
- *
- * @typedef {object} LogMealAction
- * @property {'log_meal'} type
- * @property {{description: string, date?: string, macros: {calories: number, protein_g: number, carbs_g: number, fat_g: number}}} data
- *
- * @typedef {object} LogWeightAction
- * @property {'log_weight'} type
- * @property {{weight_lbs: number, date?: string}} data
- *
- * @typedef {object} SetWorkoutDayAction
- * @property {'set_workout_day'} type
- * @property {{is_workout_day: boolean, training_type?: string}} data
- *
- * @typedef {object} UpdatePantryAction
- * @property {'update_pantry'} type
- * @property {{added?: string[], removed?: string[]}} data
- *
- * @typedef {object} UpdateRuleAction
- * @property {'update_rule'} type
- * @property {{added?: string[], removed?: string[]}} data
- *
- * @typedef {object} OnboardingCompleteAction
- * @property {'onboarding_complete'} type
- * @property {{profile: object}} data
- *
- * log_meal is intentionally additive: dispatching the same action twice logs two
- * meals because users can eat the same meal twice. Set-like updates de-dupe.
- */
+export type ActionType =
+  | 'log_meal'
+  | 'log_weight'
+  | 'set_workout_day'
+  | 'update_pantry'
+  | 'update_rule'
+  | 'onboarding_complete';
+
+export interface ActionData {
+  description?: string;
+  date?: string;
+  macros?: Partial<Record<keyof MacroTotals, number | string>>;
+  weight_lbs?: number | string;
+  is_workout_day?: boolean;
+  training_type?: string;
+  added?: unknown[];
+  removed?: unknown[];
+  add?: unknown[];
+  remove?: unknown[];
+  profile?: unknown;
+}
+
+export interface ParsedAction {
+  type: ActionType | string;
+  data: ActionData;
+}
+
+export interface ApplyActionOptions {
+  dateString?: string;
+  now?: Date;
+}
 
 const ACTION_PATTERN = /\[ACTION\]([\s\S]*?)\[\/ACTION\]/g;
-const MACRO_KEYS = ['calories', 'protein_g', 'carbs_g', 'fat_g'];
+const MACRO_KEYS: Array<keyof MacroTotals> = ['calories', 'protein_g', 'carbs_g', 'fat_g'];
 
-function timestampFrom(now) {
+function timestampFrom(now: Date | string | number): string {
   return now instanceof Date ? now.toISOString() : new Date(now).toISOString();
 }
 
-function isValidDateString(dateString) {
+function isValidDateString(dateString: unknown): dateString is string {
   if (typeof dateString !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
     return false;
   }
@@ -61,11 +67,11 @@ function isValidDateString(dateString) {
   );
 }
 
-function resolveActionDate(actionDate, fallbackDateString) {
+function resolveActionDate(actionDate: unknown, fallbackDateString: string): string {
   return isValidDateString(actionDate) ? actionDate : fallbackDateString;
 }
 
-function parseActionJson(rawJson) {
+function parseActionJson(rawJson: string): unknown {
   try {
     return JSON.parse(rawJson);
   } catch {
@@ -73,7 +79,7 @@ function parseActionJson(rawJson) {
   }
 }
 
-function normalizeStringList(value) {
+function normalizeStringList(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -81,22 +87,23 @@ function normalizeStringList(value) {
   return value.map((item) => String(item).trim()).filter(Boolean);
 }
 
-function normalizeMacros(macros = {}) {
-  return MACRO_KEYS.reduce((normalized, key) => {
-    const value = Number(macros[key] ?? 0);
-    return {
-      ...normalized,
-      [key]: Number.isFinite(value) ? value : 0,
-    };
-  }, {});
+function normalizeMacros(macros: ActionData['macros'] = {}): MacroTotals {
+  return MACRO_KEYS.reduce<MacroTotals>(
+    (normalized, key) => {
+      const value = Number(macros?.[key] ?? 0);
+      normalized[key] = Number.isFinite(value) ? value : 0;
+      return normalized;
+    },
+    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 },
+  );
 }
 
-function sumMealTotals(meals) {
-  return meals.reduce(
+function sumMealTotals(meals: Meal[]): MacroTotals {
+  return meals.reduce<MacroTotals>(
     (totals, meal) => {
       const macros = normalizeMacros(meal.macros);
 
-      return MACRO_KEYS.reduce(
+      return MACRO_KEYS.reduce<MacroTotals>(
         (nextTotals, key) => ({
           ...nextTotals,
           [key]: nextTotals[key] + macros[key],
@@ -108,11 +115,14 @@ function sumMealTotals(meals) {
   );
 }
 
-function lowerSet(values) {
+function lowerSet(values: string[]): Set<string> {
   return new Set(values.map((value) => String(value).toLowerCase()));
 }
 
-function applyLogMeal(action, { dateString = todayString(), now = new Date() } = {}) {
+function applyLogMeal(
+  action: ParsedAction,
+  { dateString = todayString(), now = new Date() }: ApplyActionOptions = {},
+): DailyLog | null {
   const description = String(action.data?.description ?? '').trim();
   if (!description) {
     return null;
@@ -122,7 +132,7 @@ function applyLogMeal(action, { dateString = todayString(), now = new Date() } =
   const log = getOrInitDailyLog(targetDateString);
   const meals = log.meals ?? [];
   const loggedAt = timestampFrom(now);
-  const nextMeals = [
+  const nextMeals: Meal[] = [
     ...meals,
     {
       id: `meal_${loggedAt.replace(/[^0-9]/g, '')}_${meals.length + 1}`,
@@ -131,7 +141,7 @@ function applyLogMeal(action, { dateString = todayString(), now = new Date() } =
       macros: normalizeMacros(action.data?.macros),
     },
   ];
-  const nextLog = {
+  const nextLog: DailyLog = {
     ...log,
     meals: nextMeals,
     totals: sumMealTotals(nextMeals),
@@ -140,7 +150,7 @@ function applyLogMeal(action, { dateString = todayString(), now = new Date() } =
   return setDailyLog(targetDateString, nextLog);
 }
 
-function applyLogWeight(action) {
+function applyLogWeight(action: ParsedAction): UserProfile | null {
   const weight = Number(action.data?.weight_lbs);
   const profile = getUserProfile();
   if (!profile || !Number.isFinite(weight)) {
@@ -153,9 +163,12 @@ function applyLogWeight(action) {
   });
 }
 
-function applySetWorkoutDay(action, { dateString = todayString() } = {}) {
+function applySetWorkoutDay(
+  action: ParsedAction,
+  { dateString = todayString() }: ApplyActionOptions = {},
+): DailyLog {
   const log = getOrInitDailyLog(dateString);
-  const nextLog = {
+  const nextLog: DailyLog = {
     ...log,
     is_workout_day: Boolean(action.data?.is_workout_day),
   };
@@ -163,8 +176,12 @@ function applySetWorkoutDay(action, { dateString = todayString() } = {}) {
   return setDailyLog(dateString, nextLog);
 }
 
-function applyUpdatePantry(action, { now = new Date() } = {}) {
-  const pantry = getPantry() ?? { items: [], last_updated: null };
+function applyUpdatePantry(
+  action: ParsedAction,
+  { now = new Date() }: ApplyActionOptions = {},
+): Pantry {
+  const pantry: Pantry =
+    getPantry() ?? { items: [], last_updated: '' };
   const removed = lowerSet(normalizeStringList(action.data?.removed ?? action.data?.remove));
   const added = normalizeStringList(action.data?.added ?? action.data?.add);
   const nextItems = (pantry.items ?? []).filter(
@@ -186,7 +203,7 @@ function applyUpdatePantry(action, { now = new Date() } = {}) {
   });
 }
 
-function applyUpdateRule(action) {
+function applyUpdateRule(action: ParsedAction): UserProfile | null {
   const profile = getUserProfile();
   if (!profile) {
     return null;
@@ -212,32 +229,41 @@ function applyUpdateRule(action) {
   });
 }
 
-export function parseActions(reply = '') {
+function isActionShape(value: unknown): value is { type: unknown; data?: unknown } {
+  return typeof value === 'object' && value !== null && 'type' in value;
+}
+
+export function parseActions(reply = ''): ParsedAction[] {
   return Array.from(reply.matchAll(ACTION_PATTERN))
     .map((match) => parseActionJson(match[1]))
-    .filter((action) => typeof action?.type === 'string')
+    .filter((action): action is { type: string; data?: ActionData } => {
+      return isActionShape(action) && typeof action.type === 'string';
+    })
     .map((action) => ({
       type: action.type,
-      data: action.data ?? {},
+      data: (action.data as ActionData) ?? {},
     }));
 }
 
-export function stripActionEnvelopes(reply = '') {
+export function stripActionEnvelopes(reply = ''): string {
   return reply.replace(ACTION_PATTERN, '').trim();
 }
 
-export function applyAction(action, options = {}) {
+export function applyAction(
+  action: ParsedAction | null | undefined,
+  options: ApplyActionOptions = {},
+): unknown {
   switch (action?.type) {
     case 'log_meal':
       return applyLogMeal(action, options);
     case 'log_weight':
-      return applyLogWeight(action, options);
+      return applyLogWeight(action);
     case 'set_workout_day':
       return applySetWorkoutDay(action, options);
     case 'update_pantry':
       return applyUpdatePantry(action, options);
     case 'update_rule':
-      return applyUpdateRule(action, options);
+      return applyUpdateRule(action);
     case 'onboarding_complete':
       return null;
     default:
@@ -245,6 +271,9 @@ export function applyAction(action, options = {}) {
   }
 }
 
-export function applyActions(actions, options = {}) {
+export function applyActions(
+  actions: ParsedAction[],
+  options: ApplyActionOptions = {},
+): unknown[] {
   return actions.map((action) => applyAction(action, options));
 }

@@ -6,7 +6,7 @@ import {
   getOnboardingRoute,
   parseOnboardingCompleteAction,
   stripActionEnvelopes,
-} from './onboarding.js';
+} from './onboarding.ts';
 
 test('parseOnboardingCompleteAction extracts profile data from an action envelope', () => {
   const reply = [

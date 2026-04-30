@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 
-import { defaultBubbyState } from '../lib/vitalDecay.js';
+import { defaultBubbyState } from '../lib/vitalDecay.ts';
 import {
   getBubbyState,
   setBubbyState,
-} from '../lib/storage.js';
+} from '../lib/storage.ts';
 
 const VITALS = [
   { key: 'vitality', label: 'vit' },

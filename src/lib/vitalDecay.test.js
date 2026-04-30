@@ -10,7 +10,7 @@ import {
   clampVital,
   defaultBubbyState,
   refreshSickState,
-} from './vitalDecay.js';
+} from './vitalDecay.ts';
 import {
   clearAll,
   getBubbyState,
@@ -18,7 +18,7 @@ import {
   setBubbyState,
   setDailyLog,
   setUserProfile,
-} from './storage.js';
+} from './storage.ts';
 
 class MemoryStorage {
   #items = new Map();

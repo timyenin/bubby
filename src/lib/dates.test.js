@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { daysSince, formatDate, todayString } from './dates.js';
+import { daysSince, formatDate, todayString } from './dates.ts';
 
 test('todayString returns a local YYYY-MM-DD date', () => {
   assert.match(todayString(), /^\d{4}-\d{2}-\d{2}$/);

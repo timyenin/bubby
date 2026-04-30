@@ -1,32 +1,69 @@
-export const LOOPING_ANIMATIONS = ['idle', 'sleepy', 'sick'];
-export const ONE_SHOT_ANIMATIONS = ['eating', 'happy_bounce', 'workout', 'recovery'];
+import type { BubbyState, DailyLog, UserProfile } from './storage.ts';
+import type { ParsedAction } from './actions.ts';
+
+export type LoopingAnimation = 'idle' | 'sleepy' | 'sick';
+export type OneShotAnimation = 'eating' | 'happy_bounce' | 'workout' | 'recovery';
+export type AnimationName = LoopingAnimation | OneShotAnimation;
+
+export const LOOPING_ANIMATIONS: LoopingAnimation[] = ['idle', 'sleepy', 'sick'];
+export const ONE_SHOT_ANIMATIONS: OneShotAnimation[] = [
+  'eating',
+  'happy_bounce',
+  'workout',
+  'recovery',
+];
 
 const LATE_NIGHT_HOUR = 23;
 const REST_EVENING_HOUR = 19;
 
-function isOneShot(animationName) {
-  return ONE_SHOT_ANIMATIONS.includes(animationName);
+export interface AnimationState {
+  baseAnimation: LoopingAnimation;
+  currentAnimation: AnimationName;
+  queue: OneShotAnimation[];
+  playbackId: number;
+  isPlayingOneShot: boolean;
 }
 
-function isLateNight(now) {
+export interface BaseAnimationOptions {
+  bubbyState?: BubbyState | null;
+  dailyLog?: DailyLog | null;
+  now?: Date;
+}
+
+function isOneShot(animationName: AnimationName | string): animationName is OneShotAnimation {
+  return ONE_SHOT_ANIMATIONS.includes(animationName as OneShotAnimation);
+}
+
+function isLateNight(now: Date): boolean {
   return now.getHours() >= LATE_NIGHT_HOUR || now.getHours() < 5;
 }
 
-function isRestDayEvening(dailyLog, now) {
+function isRestDayEvening(dailyLog: DailyLog | null | undefined, now: Date): boolean {
   return dailyLog?.is_workout_day === false && now.getHours() >= REST_EVENING_HOUR;
 }
 
-function getProteinTotal(dailyLog) {
+function getProteinTotal(dailyLog: DailyLog | null | undefined): number {
   return Number(dailyLog?.totals?.protein_g ?? 0);
 }
 
-function getProteinTarget(userProfile, dailyLog) {
+function getProteinTarget(
+  userProfile: UserProfile | null | undefined,
+  dailyLog: DailyLog | null | undefined,
+): number {
   const targets = userProfile?.macro_targets;
   const target = dailyLog?.is_workout_day ? targets?.workout_day : targets?.rest_day;
   return Number(target?.protein_g ?? 0);
 }
 
-function didCrossProteinTarget({ userProfile, beforeDailyLog, afterDailyLog }) {
+function didCrossProteinTarget({
+  userProfile,
+  beforeDailyLog,
+  afterDailyLog,
+}: {
+  userProfile: UserProfile | null | undefined;
+  beforeDailyLog: DailyLog | null | undefined;
+  afterDailyLog: DailyLog | null | undefined;
+}): boolean {
   const target = getProteinTarget(userProfile, afterDailyLog);
   if (target <= 0) {
     return false;
@@ -39,7 +76,7 @@ export function resolveBaseAnimation({
   bubbyState = null,
   dailyLog = null,
   now = new Date(),
-} = {}) {
+}: BaseAnimationOptions = {}): LoopingAnimation {
   if (bubbyState?.is_sick === true) {
     return 'sick';
   }
@@ -56,7 +93,7 @@ export function createAnimationState({
   currentAnimation = baseAnimation,
   queue = [],
   playbackId = 0,
-} = {}) {
+}: Partial<AnimationState> = {}): AnimationState {
   return {
     baseAnimation,
     currentAnimation,
@@ -66,7 +103,10 @@ export function createAnimationState({
   };
 }
 
-export function enqueueReactiveAnimations(state, animations = []) {
+export function enqueueReactiveAnimations(
+  state: AnimationState,
+  animations: AnimationName[] = [],
+): AnimationState {
   const reactiveAnimations = animations.filter(isOneShot);
   if (reactiveAnimations.length === 0) {
     return state;
@@ -89,7 +129,7 @@ export function enqueueReactiveAnimations(state, animations = []) {
   };
 }
 
-export function finishCurrentAnimation(state) {
+export function finishCurrentAnimation(state: AnimationState): AnimationState {
   if (!state.isPlayingOneShot) {
     return state;
   }
@@ -113,10 +153,13 @@ export function finishCurrentAnimation(state) {
   };
 }
 
-export function syncBaseAnimation(state, options = {}) {
+export function syncBaseAnimation(
+  state: AnimationState,
+  options: BaseAnimationOptions = {},
+): AnimationState {
   const nextBaseAnimation = resolveBaseAnimation(options);
   const leavingSick = state.baseAnimation === 'sick' && nextBaseAnimation !== 'sick';
-  const nextState = {
+  const nextState: AnimationState = {
     ...state,
     baseAnimation: nextBaseAnimation,
     currentAnimation: state.isPlayingOneShot ? state.currentAnimation : nextBaseAnimation,
@@ -134,8 +177,13 @@ export function actionsToReactiveAnimations({
   userProfile = null,
   beforeDailyLog = null,
   afterDailyLog = null,
-} = {}) {
-  const animations = [];
+}: {
+  actions?: ParsedAction[];
+  userProfile?: UserProfile | null;
+  beforeDailyLog?: DailyLog | null;
+  afterDailyLog?: DailyLog | null;
+} = {}): OneShotAnimation[] {
+  const animations: OneShotAnimation[] = [];
 
   for (const action of actions) {
     if (action.type === 'log_meal') {

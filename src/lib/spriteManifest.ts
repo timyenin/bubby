@@ -1,17 +1,44 @@
 const SPRITE_ROOT = '/assets/sprites';
 const MANIFEST_URL = `${SPRITE_ROOT}/manifest.json`;
 
-export async function loadSpriteManifest() {
+export interface SheetMeta {
+  file: string;
+  size: [number, number];
+}
+
+export interface SpriteManifest {
+  sprite_size: [number, number];
+  all_sheet?: SheetMeta;
+  animations: Record<string, unknown[] | SheetMeta>;
+}
+
+export interface ResolvedAnimationSheet {
+  animationName: string;
+  frameCount: number;
+  frameSize: [number, number];
+  sheetSize: [number, number];
+  src: string;
+  xOffset: number;
+}
+
+export async function loadSpriteManifest(): Promise<SpriteManifest> {
   const response = await fetch(MANIFEST_URL);
 
   if (!response.ok) {
     throw new Error(`sprite manifest failed: ${response.status}`);
   }
 
-  return response.json();
+  return response.json() as Promise<SpriteManifest>;
 }
 
-export function resolveAnimationSheet(manifest, animationName) {
+function isSheetMeta(value: unknown): value is SheetMeta {
+  return typeof value === 'object' && value !== null && 'file' in value && 'size' in value;
+}
+
+export function resolveAnimationSheet(
+  manifest: SpriteManifest,
+  animationName: string,
+): ResolvedAnimationSheet {
   if (manifest.all_sheet) {
     return resolveFromAllSheet(manifest, animationName);
   }
@@ -20,7 +47,7 @@ export function resolveAnimationSheet(manifest, animationName) {
   const animationFrames = manifest.animations?.[animationName];
   const animationSheet = manifest.animations?.[sheetKey];
 
-  if (animationSheet) {
+  if (animationSheet && isSheetMeta(animationSheet)) {
     return {
       animationName,
       frameCount: Array.isArray(animationFrames) ? animationFrames.length : 0,
@@ -34,7 +61,10 @@ export function resolveAnimationSheet(manifest, animationName) {
   return resolveFromAllSheet(manifest, animationName);
 }
 
-function resolveFromAllSheet(manifest, animationName) {
+function resolveFromAllSheet(
+  manifest: SpriteManifest,
+  animationName: string,
+): ResolvedAnimationSheet {
   const allSheet = manifest.all_sheet;
   const animationFrames = manifest.animations?.[animationName];
 
@@ -43,7 +73,7 @@ function resolveFromAllSheet(manifest, animationName) {
   }
 
   const orderedAnimations = Object.entries(manifest.animations)
-    .filter(([, value]) => Array.isArray(value))
+    .filter((entry): entry is [string, unknown[]] => Array.isArray(entry[1]))
     .map(([name, frames]) => ({ name, frameCount: frames.length }));
 
   const animationIndex = orderedAnimations.findIndex(

@@ -8,7 +8,7 @@ import {
   calculateTDEE,
   calculateWeightLossRate,
   isUnderCalorieFloor,
-} from './macros.js';
+} from './macros.ts';
 
 test('calculateBMR uses Mifflin-St Jeor for Tim reference values', () => {
   assert.equal(

@@ -1,16 +1,33 @@
-import { formatDate, todayString } from './dates.js';
+import { formatDate, todayString } from './dates.ts';
 import {
   getBubbyState,
   getDailyLog,
   getUserProfile,
   setBubbyState,
   setDailyLog,
-} from './storage.js';
+  type BubbyState,
+  type DailyLog,
+  type UserProfile,
+  type VitalName,
+} from './storage.ts';
 
 export const CALORIE_FLOOR_PENALTY_FLAG = 'calorie_floor_penalty_applied';
 export const PROTEIN_TARGET_REWARD_FLAG = 'protein_target_vitals_awarded';
 
-const DECAY_RATES = {
+interface ActionData {
+  date?: string;
+  macros?: { protein_g?: number | string };
+  is_workout_day?: boolean;
+}
+
+interface VitalAction {
+  type?: string;
+  data?: ActionData;
+}
+
+type VitalDeltas = Partial<Record<VitalName, number>>;
+
+const DECAY_RATES: Record<VitalName, number> = {
   vitality: -2,
   energy: -2,
   mood: -1,
@@ -18,15 +35,15 @@ const DECAY_RATES = {
 };
 const MAX_DECAY_DAYS = 14;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const VITAL_KEYS = ['vitality', 'mood', 'strength', 'energy'];
+const VITAL_KEYS: VitalName[] = ['vitality', 'mood', 'strength', 'energy'];
 const ACTION_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const SICK_RECOVERY_MEAL_FLAG = 'sick_recovery_meals';
 
-export function clampVital(value) {
+export function clampVital(value: unknown): number {
   return Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
 }
 
-export function defaultBubbyState(now = new Date()) {
+export function defaultBubbyState(now: Date = new Date()): BubbyState {
   return {
     vitality: 80,
     mood: 70,
@@ -39,26 +56,32 @@ export function defaultBubbyState(now = new Date()) {
   };
 }
 
-function parseDateString(dateString) {
+interface DateParts {
+  year: number;
+  month: number;
+  day: number;
+}
+
+function parseDateString(dateString: string): DateParts {
   const [year, month, day] = dateString.split('-').map(Number);
   return { year, month, day };
 }
 
-function utcDayValue(dateString) {
+function utcDayValue(dateString: string): number {
   const { year, month, day } = parseDateString(dateString);
   return Date.UTC(year, month - 1, day);
 }
 
-function daysBetween(dateString, laterDateString) {
+function daysBetween(dateString: string, laterDateString: string): number {
   return Math.round((utcDayValue(laterDateString) - utcDayValue(dateString)) / MS_PER_DAY);
 }
 
-function offsetDateString(dateString, dayOffset) {
+function offsetDateString(dateString: string, dayOffset: number): string {
   const { year, month, day } = parseDateString(dateString);
   return formatDate(new Date(year, month - 1, day + dayOffset));
 }
 
-function isValidDateString(dateString) {
+function isValidDateString(dateString: unknown): dateString is string {
   if (typeof dateString !== 'string' || !ACTION_DATE_PATTERN.test(dateString)) {
     return false;
   }
@@ -73,20 +96,20 @@ function isValidDateString(dateString) {
   );
 }
 
-function resolveActionDate(actionDate, fallbackDateString) {
+function resolveActionDate(actionDate: unknown, fallbackDateString: string): string {
   return isValidDateString(actionDate) ? actionDate : fallbackDateString;
 }
 
-function getStateOrDefault(now = new Date()) {
+function getStateOrDefault(now: Date = new Date()): BubbyState {
   return getBubbyState() ?? defaultBubbyState(now);
 }
 
-function normalizeState(state, now = new Date()) {
+function normalizeState(state: Partial<BubbyState> | null | undefined, now: Date = new Date()): BubbyState {
   const fallback = defaultBubbyState(now);
 
   return {
     ...fallback,
-    ...state,
+    ...(state ?? {}),
     vitality: clampVital(state?.vitality ?? fallback.vitality),
     mood: clampVital(state?.mood ?? fallback.mood),
     strength: clampVital(state?.strength ?? fallback.strength),
@@ -95,7 +118,7 @@ function normalizeState(state, now = new Date()) {
   };
 }
 
-function saveBubbyState(state) {
+function saveBubbyState(state: BubbyState): BubbyState {
   const saved = setBubbyState(state);
 
   if (typeof window !== 'undefined') {
@@ -105,13 +128,14 @@ function saveBubbyState(state) {
   return saved;
 }
 
-function withVitalDeltas(state, deltas, now = new Date()) {
+function withVitalDeltas(state: BubbyState, deltas: VitalDeltas, now: Date = new Date()): BubbyState {
   const normalized = normalizeState(state, now);
-  const nextState = { ...normalized };
+  const nextState: BubbyState = { ...normalized };
 
   for (const key of VITAL_KEYS) {
-    if (typeof deltas[key] === 'number') {
-      nextState[key] = clampVital(normalized[key] + deltas[key]);
+    const delta = deltas[key];
+    if (typeof delta === 'number') {
+      nextState[key] = clampVital(normalized[key] + delta);
     }
   }
 
@@ -121,28 +145,31 @@ function withVitalDeltas(state, deltas, now = new Date()) {
   };
 }
 
-function hasLoggedMeal(dailyLog) {
-  return Array.isArray(dailyLog?.meals) && dailyLog.meals.length > 0;
+function hasLoggedMeal(dailyLog: DailyLog | null | undefined): boolean {
+  return Array.isArray(dailyLog?.meals) && (dailyLog?.meals.length ?? 0) > 0;
 }
 
-function isBelowCalorieFloor(dailyLog, userProfile) {
+function isBelowCalorieFloor(
+  dailyLog: DailyLog | null | undefined,
+  userProfile: UserProfile | null | undefined,
+): boolean {
   const floor = Number(userProfile?.calorie_floor ?? 0);
   const calories = Number(dailyLog?.totals?.calories ?? 0);
 
   return floor > 0 && hasLoggedMeal(dailyLog) && calories < floor;
 }
 
-function hasFlag(dailyLog, flag) {
+function hasFlag(dailyLog: DailyLog | null | undefined, flag: string): boolean {
   return dailyLog?.adherence_flags?.includes(flag) === true;
 }
 
-function getNumberFlagValue(dailyLog, flagPrefix) {
+function getNumberFlagValue(dailyLog: DailyLog | null | undefined, flagPrefix: string): number {
   const rawFlag = dailyLog?.adherence_flags?.find((flag) => flag.startsWith(`${flagPrefix}:`));
   const value = Number(rawFlag?.split(':')[1]);
   return Number.isFinite(value) ? value : 0;
 }
 
-function setNumberFlagValue(dateString, flagPrefix, value) {
+function setNumberFlagValue(dateString: string, flagPrefix: string, value: number): DailyLog | null {
   const dailyLog = getDailyLog(dateString);
   if (!dailyLog) {
     return null;
@@ -157,7 +184,7 @@ function setNumberFlagValue(dateString, flagPrefix, value) {
   });
 }
 
-function addFlagToDailyLog(dateString, flag) {
+function addFlagToDailyLog(dateString: string, flag: string): DailyLog | null {
   const dailyLog = getDailyLog(dateString);
   if (!dailyLog || hasFlag(dailyLog, flag)) {
     return dailyLog;
@@ -169,13 +196,24 @@ function addFlagToDailyLog(dateString, flag) {
   });
 }
 
-function getProteinTarget(userProfile, dailyLog) {
+function getProteinTarget(
+  userProfile: UserProfile | null | undefined,
+  dailyLog: DailyLog | null | undefined,
+): number {
   const targets = userProfile?.macro_targets;
   const target = dailyLog?.is_workout_day ? targets?.workout_day : targets?.rest_day;
   return Number(target?.protein_g ?? 0);
 }
 
-function crossesProteinTarget({ beforeDailyLog, afterDailyLog, userProfile }) {
+function crossesProteinTarget({
+  beforeDailyLog,
+  afterDailyLog,
+  userProfile,
+}: {
+  beforeDailyLog: DailyLog | null | undefined;
+  afterDailyLog: DailyLog | null | undefined;
+  userProfile: UserProfile | null | undefined;
+}): boolean {
   const target = getProteinTarget(userProfile, afterDailyLog);
   if (target <= 0 || hasFlag(afterDailyLog, PROTEIN_TARGET_REWARD_FLAG)) {
     return false;
@@ -187,7 +225,11 @@ function crossesProteinTarget({ beforeDailyLog, afterDailyLog, userProfile }) {
   );
 }
 
-function recentFloorBreaches(userProfile, now = new Date(), dayCount = 3) {
+function recentFloorBreaches(
+  userProfile: UserProfile | null | undefined,
+  now: Date = new Date(),
+  dayCount = 3,
+): boolean[] {
   const currentDateString = formatDate(now);
 
   return Array.from({ length: dayCount }, (_, index) => {
@@ -196,13 +238,19 @@ function recentFloorBreaches(userProfile, now = new Date(), dayCount = 3) {
   });
 }
 
-function hasConsecutiveFloorBreaches(userProfile, now = new Date()) {
+function hasConsecutiveFloorBreaches(
+  userProfile: UserProfile | null | undefined,
+  now: Date = new Date(),
+): boolean {
   const breaches = recentFloorBreaches(userProfile, now, 3);
 
   return breaches.some((isBreach, index) => isBreach && breaches[index + 1] === true);
 }
 
-function hasFloorBreachInLastTwoDays(userProfile, now = new Date()) {
+function hasFloorBreachInLastTwoDays(
+  userProfile: UserProfile | null | undefined,
+  now: Date = new Date(),
+): boolean {
   return recentFloorBreaches(userProfile, now, 2).some(Boolean);
 }
 
@@ -213,7 +261,14 @@ function applySickRecoveryMealBoost({
   deltas,
   userProfile,
   now,
-}) {
+}: {
+  dailyLog: DailyLog | null | undefined;
+  targetDateString: string;
+  currentState: BubbyState;
+  deltas: VitalDeltas;
+  userProfile: UserProfile | null | undefined;
+  now: Date;
+}): void {
   if (
     !currentState.is_sick ||
     hasFloorBreachInLastTwoDays(userProfile, now)
@@ -229,20 +284,23 @@ function applySickRecoveryMealBoost({
   }
 }
 
-export function applyVitalDecayToState(state, now = new Date()) {
+export function applyVitalDecayToState(
+  state: Partial<BubbyState> | null | undefined,
+  now: Date = new Date(),
+): BubbyState {
   const normalized = normalizeState(state, now);
   const lastUpdatedDateString = formatDate(new Date(normalized.last_updated));
   const currentDateString = formatDate(now);
   const daysSinceUpdate = daysBetween(lastUpdatedDateString, currentDateString);
 
   if (daysSinceUpdate <= 0) {
-    return state;
+    return state as BubbyState;
   }
 
   const decayDays = Math.min(daysSinceUpdate, MAX_DECAY_DAYS);
-  const decayedState = { ...normalized };
+  const decayedState: BubbyState = { ...normalized };
 
-  for (const [key, rate] of Object.entries(DECAY_RATES)) {
+  for (const [key, rate] of Object.entries(DECAY_RATES) as Array<[VitalName, number]>) {
     decayedState[key] = clampVital(normalized[key] + rate * decayDays);
   }
 
@@ -252,7 +310,10 @@ export function applyVitalDecayToState(state, now = new Date()) {
   };
 }
 
-export function refreshSickState({ now = new Date(), userProfile = getUserProfile() } = {}) {
+export function refreshSickState({
+  now = new Date(),
+  userProfile = getUserProfile(),
+}: { now?: Date; userProfile?: UserProfile | null } = {}): BubbyState {
   const currentState = getStateOrDefault(now);
   let nextIsSick = Boolean(currentState.is_sick);
 
@@ -276,7 +337,7 @@ export function refreshSickState({ now = new Date(), userProfile = getUserProfil
   });
 }
 
-export function applyVitalDecay({ now = new Date() } = {}) {
+export function applyVitalDecay({ now = new Date() }: { now?: Date } = {}): BubbyState {
   const currentState = getBubbyState();
 
   if (!currentState) {
@@ -292,16 +353,22 @@ export function applyVitalDecay({ now = new Date() } = {}) {
   return getBubbyState() ?? savedState;
 }
 
-export function applyVitalDeltas(deltas, { now = new Date() } = {}) {
+export function applyVitalDeltas(
+  deltas: VitalDeltas,
+  { now = new Date() }: { now?: Date } = {},
+): BubbyState {
   const nextState = withVitalDeltas(getStateOrDefault(now), deltas, now);
   saveBubbyState(nextState);
   return refreshSickState({ now });
 }
 
 export function applyCalorieFloorPenaltyForDate(
-  dateString,
-  { now = new Date(), userProfile = getUserProfile() } = {},
-) {
+  dateString: string,
+  {
+    now = new Date(),
+    userProfile = getUserProfile(),
+  }: { now?: Date; userProfile?: UserProfile | null } = {},
+): BubbyState | null {
   const dailyLog = getDailyLog(dateString);
   if (
     !dailyLog ||
@@ -317,20 +384,25 @@ export function applyCalorieFloorPenaltyForDate(
 }
 
 export function applyActionVitalEffects(
-  action,
+  action: VitalAction,
   {
     dateString = todayString(),
     now = new Date(),
     beforeDailyLog = null,
     userProfile = getUserProfile(),
+  }: {
+    dateString?: string;
+    now?: Date;
+    beforeDailyLog?: DailyLog | null;
+    userProfile?: UserProfile | null;
   } = {},
-) {
+): BubbyState {
   if (!action?.type) {
     return getStateOrDefault(now);
   }
 
   const targetDateString = resolveActionDate(action.data?.date, dateString);
-  const deltas = {};
+  const deltas: VitalDeltas = {};
 
   if (action.type === 'log_meal') {
     const protein = Number(action.data?.macros?.protein_g ?? 0);
@@ -383,14 +455,19 @@ export function applyActionVitalEffects(
 }
 
 export function applyActionsVitalEffects(
-  actions,
+  actions: VitalAction[],
   {
     dateString = todayString(),
     now = new Date(),
     beforeDailyLog = null,
     userProfile = getUserProfile(),
+  }: {
+    dateString?: string;
+    now?: Date;
+    beforeDailyLog?: DailyLog | null;
+    userProfile?: UserProfile | null;
   } = {},
-) {
+): BubbyState {
   let runningBeforeDailyLog = beforeDailyLog;
 
   for (const action of actions) {

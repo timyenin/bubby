@@ -4,7 +4,7 @@ import test from 'node:test';
 import {
   MAX_UPLOAD_BYTES,
   processImageForUpload,
-} from './imageProcessing.js';
+} from './imageProcessing.ts';
 
 function createImageFile(overrides = {}) {
   return {

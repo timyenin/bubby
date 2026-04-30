@@ -1,23 +1,52 @@
-import { formatDate, todayString } from './dates.js';
+import { formatDate, todayString } from './dates.ts';
 import {
   calculateWeightLossRate,
   isUnderCalorieFloor,
-} from './macros.js';
+  type MacroTargets,
+} from './macros.ts';
 import {
   getBubbyState,
   getConversationHistory,
   getDailyLog,
   getPantry,
   getUserProfile,
-} from './storage.js';
+  type BubbyState,
+  type ConversationHistory,
+  type DailyLog,
+  type MacroTotals,
+  type Pantry,
+  type UserProfile,
+} from './storage.ts';
 
 const RECENT_HISTORY_LIMIT = 20;
-const MACRO_KEYS = ['calories', 'protein_g', 'carbs_g', 'fat_g'];
+const MACRO_KEYS: Array<keyof MacroTotals> = ['calories', 'protein_g', 'carbs_g', 'fat_g'];
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const SHORT_WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const WEIGHT_LOSS_RATE_LIMIT = 1.5;
 
-function defaultBubbyState(currentTime) {
+export type ConcernLevel = 'normal' | 'elevated';
+export type WeightLossSignal = 'normal' | 'too_fast';
+
+export interface CompactHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatContext {
+  user_profile: UserProfile | null;
+  macros_today: Partial<MacroTotals>;
+  macros_remaining: Partial<MacroTotals>;
+  training_today: string | null;
+  pantry: Pantry | null;
+  recent_history: CompactHistoryMessage[];
+  bubby_state: BubbyState;
+  concern_level: ConcernLevel;
+  weight_loss_rate: WeightLossSignal;
+  current_time: string;
+  is_onboarding: boolean;
+}
+
+function defaultBubbyState(currentTime: string): BubbyState {
   return {
     vitality: 80,
     mood: 70,
@@ -30,7 +59,9 @@ function defaultBubbyState(currentTime) {
   };
 }
 
-function compactHistory(conversationHistory) {
+function compactHistory(
+  conversationHistory: ConversationHistory | null | undefined,
+): CompactHistoryMessage[] {
   const messages = conversationHistory?.messages ?? [];
 
   return messages
@@ -42,7 +73,10 @@ function compactHistory(conversationHistory) {
     }));
 }
 
-function getTargetForDay(userProfile, dailyLog) {
+function getTargetForDay(
+  userProfile: UserProfile | null | undefined,
+  dailyLog: DailyLog | null | undefined,
+): MacroTargets | null {
   const targets = userProfile?.macro_targets;
   if (!targets) {
     return null;
@@ -51,7 +85,7 @@ function getTargetForDay(userProfile, dailyLog) {
   return dailyLog?.is_workout_day ? targets.workout_day : targets.rest_day;
 }
 
-function getWeekdayKeys(now) {
+function getWeekdayKeys(now: Date): Array<string | number> {
   const weekdayIndex = now.getDay();
   const fullName = WEEKDAYS[weekdayIndex];
   const shortName = SHORT_WEEKDAYS[weekdayIndex];
@@ -59,31 +93,37 @@ function getWeekdayKeys(now) {
   return [fullName, fullName[0].toUpperCase() + fullName.slice(1), shortName, weekdayIndex];
 }
 
-function offsetDateString(dateString, dayOffset) {
+function offsetDateString(dateString: string, dayOffset: number): string {
   const [year, month, day] = dateString.split('-').map(Number);
   return formatDate(new Date(year, month - 1, day + dayOffset));
 }
 
-function hasLoggedMeal(dailyLog) {
-  return Array.isArray(dailyLog?.meals) && dailyLog.meals.length > 0;
+function hasLoggedMeal(dailyLog: DailyLog | null | undefined): boolean {
+  return Array.isArray(dailyLog?.meals) && (dailyLog?.meals.length ?? 0) > 0;
 }
 
-function loggedBelowFloor(dailyLog, calorieFloor) {
+function loggedBelowFloor(
+  dailyLog: DailyLog | null | undefined,
+  calorieFloor: number,
+): boolean {
   return (
     Number(calorieFloor) > 0 &&
     hasLoggedMeal(dailyLog) &&
-    isUnderCalorieFloor(dailyLog.totals ?? {}, calorieFloor)
+    isUnderCalorieFloor(dailyLog?.totals ?? { calories: 0 }, calorieFloor)
   );
 }
 
-function collectRecentDailyLogs(dateString, dayCount) {
+function collectRecentDailyLogs(dateString: string, dayCount: number): Array<DailyLog | null> {
   return Array.from({ length: dayCount }, (_, index) => {
     const logDate = offsetDateString(dateString, index - dayCount + 1);
     return getDailyLog(logDate);
   });
 }
 
-export function resolveConcernLevel(userProfile, recentDailyLogs = []) {
+export function resolveConcernLevel(
+  userProfile: UserProfile | null | undefined,
+  recentDailyLogs: Array<DailyLog | null> = [],
+): ConcernLevel {
   const calorieFloor = Number(userProfile?.calorie_floor ?? 0);
   const lastTwoLogs = recentDailyLogs.slice(-2);
 
@@ -97,9 +137,11 @@ export function resolveConcernLevel(userProfile, recentDailyLogs = []) {
   return 'normal';
 }
 
-export function resolveWeightLossRateSignal(recentDailyLogs = []) {
+export function resolveWeightLossRateSignal(
+  recentDailyLogs: Array<DailyLog | null> = [],
+): WeightLossSignal {
   const weightHistory = recentDailyLogs
-    .filter((dailyLog) => Number.isFinite(Number(dailyLog?.weigh_in_lbs)))
+    .filter((dailyLog): dailyLog is DailyLog => Number.isFinite(Number(dailyLog?.weigh_in_lbs)))
     .map((dailyLog) => ({
       date: dailyLog.date,
       weight_lbs: Number(dailyLog.weigh_in_lbs),
@@ -110,12 +152,15 @@ export function resolveWeightLossRateSignal(recentDailyLogs = []) {
     : 'normal';
 }
 
-export function calculateMacrosRemaining(target, totals = {}) {
+export function calculateMacrosRemaining(
+  target: MacroTargets | null | undefined,
+  totals: Partial<MacroTotals> = {},
+): Partial<MacroTotals> {
   if (!target) {
     return {};
   }
 
-  return MACRO_KEYS.reduce((remaining, key) => {
+  return MACRO_KEYS.reduce<Partial<MacroTotals>>((remaining, key) => {
     const targetValue = Number(target[key] ?? 0);
     const totalValue = Number(totals?.[key] ?? 0);
     return {
@@ -125,19 +170,34 @@ export function calculateMacrosRemaining(target, totals = {}) {
   }, {});
 }
 
-export function resolveTrainingToday(userProfile, now = new Date()) {
+export function resolveTrainingToday(
+  userProfile: UserProfile | null | undefined,
+  now: Date = new Date(),
+): string | null {
   const schedule = userProfile?.training_schedule;
   if (!schedule || typeof schedule !== 'object') {
     return null;
   }
 
   for (const key of getWeekdayKeys(now)) {
-    if (schedule[key]) {
-      return schedule[key];
+    const value = schedule[key as keyof typeof schedule];
+    if (value) {
+      return value;
     }
   }
 
   return null;
+}
+
+export interface BuildChatContextOptions {
+  userProfile?: UserProfile | null;
+  dailyLog?: DailyLog | null;
+  recentDailyLogs?: Array<DailyLog | null>;
+  pantry?: Pantry | null;
+  conversationHistory?: ConversationHistory | null;
+  bubbyState?: BubbyState | null;
+  now?: Date;
+  currentTime?: string;
 }
 
 export function buildChatContext({
@@ -149,7 +209,7 @@ export function buildChatContext({
   bubbyState = null,
   now = new Date(),
   currentTime = now.toISOString(),
-} = {}) {
+}: BuildChatContextOptions = {}): ChatContext {
   const macrosToday = dailyLog?.totals ?? {};
   const target = getTargetForDay(userProfile, dailyLog);
 
@@ -172,7 +232,7 @@ export function buildChatContextFromStorage({
   now = new Date(),
   dateString = todayString(),
   currentTime = now.toISOString(),
-} = {}) {
+}: { now?: Date; dateString?: string; currentTime?: string } = {}): ChatContext {
   const recentDailyLogs = collectRecentDailyLogs(dateString, 14);
 
   return buildChatContext({

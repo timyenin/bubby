@@ -7,13 +7,13 @@ import {
   ONBOARDING_OPENING_LINE,
   parseOnboardingCompleteAction,
   stripActionEnvelopes,
-} from '../lib/onboarding.js';
+} from '../lib/onboarding.ts';
 import {
   setConversationHistory,
   setOnboardingComplete,
   setPantry,
   setUserProfile,
-} from '../lib/storage.js';
+} from '../lib/storage.ts';
 
 function createMessage(role, content) {
   return {

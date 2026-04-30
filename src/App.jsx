@@ -2,8 +2,8 @@ import { useState } from 'react';
 
 import HomeScreen from './components/HomeScreen.jsx';
 import Onboarding from './components/Onboarding.jsx';
-import { getOnboardingRoute } from './lib/onboarding.js';
-import { getOnboardingComplete } from './lib/storage.js';
+import { getOnboardingRoute } from './lib/onboarding.ts';
+import { getOnboardingComplete } from './lib/storage.ts';
 
 function App() {
   const [route, setRoute] = useState(() =>

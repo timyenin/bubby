@@ -6,7 +6,7 @@ import {
   getIdleFrameDelayMs,
   getNextIdleFrameIndex,
   getSpriteBackgroundPositionPercent,
-} from './idleAnimation.js';
+} from './idleAnimation.ts';
 
 test('idle frame timing mixes long holds with short blink frames', () => {
   assert.equal(getIdleFrameDelayMs(0, () => 0.5), 5000);

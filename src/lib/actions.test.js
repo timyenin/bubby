@@ -5,7 +5,7 @@ import {
   applyAction,
   applyActions,
   parseActions,
-} from './actions.js';
+} from './actions.ts';
 import {
   clearAll,
   getDailyLog,
@@ -14,7 +14,7 @@ import {
   setDailyLog,
   setPantry,
   setUserProfile,
-} from './storage.js';
+} from './storage.ts';
 
 class MemoryStorage {
   #items = new Map();
