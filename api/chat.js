@@ -1,11 +1,11 @@
 import 'dotenv/config';
 
-import { createClaudeClient } from '../server/claude.js';
+import { createClaudeClient } from '../server/claude.ts';
 import {
   buildUserContent,
   loadPrompts,
   renderSystemPrompt,
-} from '../server/routes/chat.js';
+} from '../server/routes/chat.ts';
 
 const MAX_BODY_BYTES = Math.floor(4.5 * 1024 * 1024);
 

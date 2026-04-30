@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createApp } from '../app.js';
+import { createApp } from '../app.ts';
 import {
   buildUserContent,
   renderSystemPrompt,
-} from './chat.js';
+} from './chat.ts';
 
 const basePrompt = [
   'user profile: {{user_profile}}',

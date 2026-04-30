@@ -1,7 +1,9 @@
-import express from 'express';
+import express, { type Request, type Response, type Router } from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import type { ClaudeClient, ClaudeMessageBlock } from '../claude.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,13 +19,76 @@ const CONTEXT_PLACEHOLDERS = [
   'concern_level',
   'weight_loss_rate',
   'current_time',
-];
+] as const;
 
-function isPlainObject(value) {
+export interface Prompts {
+  basePrompt: string;
+  onboardingPrompt: string;
+}
+
+export interface ChatContextPayload {
+  user_profile?: unknown;
+  macros_today?: unknown;
+  macros_remaining?: unknown;
+  training_today?: unknown;
+  pantry?: unknown;
+  recent_history?: unknown;
+  bubby_state?: unknown;
+  concern_level?: unknown;
+  weight_loss_rate?: unknown;
+  current_time?: unknown;
+  is_onboarding?: boolean;
+  [key: string]: unknown;
+}
+
+export interface RenderSystemPromptParams {
+  basePrompt: string;
+  onboardingPrompt: string;
+  context?: ChatContextPayload;
+  isOnboarding?: boolean;
+}
+
+interface ImagePayloadObject {
+  data: string;
+  media_type: string;
+}
+
+type ImagePayload = string | ImagePayloadObject | null | undefined;
+
+interface ParsedImage {
+  mediaType: string;
+  data: string;
+}
+
+interface UserContentImageBlock {
+  type: 'image';
+  source: { type: 'base64'; media_type: string; data: string };
+}
+
+interface UserContentTextBlock {
+  type: 'text';
+  text: string;
+}
+
+type UserContent = string | Array<UserContentImageBlock | UserContentTextBlock>;
+
+interface BuildUserContentParams {
+  message: string;
+  image?: ImagePayload;
+}
+
+interface ChatRequestBody {
+  message?: string;
+  image?: ImagePayload;
+  context?: ChatContextPayload;
+  is_onboarding?: boolean;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Object.prototype.toString.call(value) === '[object Object]';
 }
 
-function isEmptyContextValue(value) {
+function isEmptyContextValue(value: unknown): boolean {
   if (value === null || value === undefined) {
     return true;
   }
@@ -43,7 +108,7 @@ function isEmptyContextValue(value) {
   return false;
 }
 
-function renderContextValue(value) {
+function renderContextValue(value: unknown): string {
   if (isEmptyContextValue(value)) {
     return '(none yet)';
   }
@@ -51,7 +116,7 @@ function renderContextValue(value) {
   return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
-function parseDataUrl(dataUrl) {
+function parseDataUrl(dataUrl: string): ParsedImage {
   const match = /^data:([^;,]+);base64,(.+)$/s.exec(dataUrl);
   if (!match) {
     throw new Error('image must be a base64 data URL');
@@ -63,7 +128,7 @@ function parseDataUrl(dataUrl) {
   };
 }
 
-function parseImagePayload(image) {
+function parseImagePayload(image: ImagePayload): ParsedImage {
   if (typeof image === 'string') {
     return parseDataUrl(image);
   }
@@ -85,7 +150,7 @@ function parseImagePayload(image) {
   throw new Error('image must include base64 data and media_type');
 }
 
-export function loadPrompts() {
+export function loadPrompts(): Prompts {
   return {
     basePrompt: fs.readFileSync(path.join(PROMPTS_DIR, 'bubby_base.md'), 'utf8'),
     onboardingPrompt: fs.readFileSync(path.join(PROMPTS_DIR, 'onboarding.md'), 'utf8'),
@@ -97,7 +162,7 @@ export function renderSystemPrompt({
   onboardingPrompt,
   context = {},
   isOnboarding = false,
-}) {
+}: RenderSystemPromptParams): string {
   let rendered = basePrompt;
 
   for (const key of CONTEXT_PLACEHOLDERS) {
@@ -111,7 +176,7 @@ export function renderSystemPrompt({
   return rendered;
 }
 
-export function buildUserContent({ message, image }) {
+export function buildUserContent({ message, image }: BuildUserContentParams): UserContent {
   if (!image) {
     return message;
   }
@@ -130,49 +195,53 @@ export function buildUserContent({ message, image }) {
   ];
 }
 
-function normalizeHistory(recentHistory) {
+function normalizeHistory(recentHistory: unknown): Array<{ role: 'user' | 'assistant'; content: string }> {
   if (!Array.isArray(recentHistory)) {
     return [];
   }
 
   return recentHistory
-    .filter((message) => (
-      (message.role === 'user' || message.role === 'assistant') &&
-      typeof message.content === 'string'
+    .filter((message): message is { role: 'user' | 'assistant'; content: string } => (
+      (message?.role === 'user' || message?.role === 'assistant') &&
+      typeof message?.content === 'string'
     ))
     .map(({ role, content }) => ({ role, content }));
 }
 
-function errorMessageForClient(error) {
-  if (error?.message === 'ANTHROPIC_API_KEY is not configured') {
+function errorMessageForClient(error: unknown): string {
+  if (error instanceof Error && error.message === 'ANTHROPIC_API_KEY is not configured') {
     return error.message;
   }
 
   return 'Claude API request failed';
 }
 
-export function createChatRouter({ claudeClient, prompts }) {
+export interface CreateChatRouterParams {
+  claudeClient: ClaudeClient;
+  prompts: Prompts;
+}
+
+export function createChatRouter({ claudeClient, prompts }: CreateChatRouterParams): Router {
   const router = express.Router();
 
-  router.post('/', async (request, response) => {
-    const { image = null, context = {} } = request.body ?? {};
-    const message = typeof request.body?.message === 'string'
-      ? request.body.message.trim()
-      : '';
+  router.post('/', async (request: Request, response: Response) => {
+    const body = (request.body ?? {}) as ChatRequestBody;
+    const { image = null, context = {} } = body;
+    const message = typeof body.message === 'string' ? body.message.trim() : '';
 
     if (!message && !image) {
       response.status(400).json({ error: 'message is required' });
       return;
     }
 
-    const isOnboarding = Boolean(context.is_onboarding ?? request.body?.is_onboarding);
+    const isOnboarding = Boolean(context.is_onboarding ?? body.is_onboarding);
     const system = renderSystemPrompt({
       basePrompt: prompts.basePrompt,
       onboardingPrompt: prompts.onboardingPrompt,
       context,
       isOnboarding,
     });
-    let userContent;
+    let userContent: UserContent;
 
     try {
       userContent = buildUserContent({ message, image });
@@ -181,7 +250,7 @@ export function createChatRouter({ claudeClient, prompts }) {
       return;
     }
 
-    const messages = [
+    const messages: ClaudeMessageBlock[] = [
       ...normalizeHistory(context.recent_history),
       {
         role: 'user',
