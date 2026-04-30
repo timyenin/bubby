@@ -7,7 +7,8 @@ import type { ClaudeClient, ClaudeMessageBlock } from '../claude.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PROMPTS_DIR = path.resolve(__dirname, '../prompts');
+const BASE_PROMPT_URL = new URL('../prompts/bubby_base.md', import.meta.url);
+const ONBOARDING_PROMPT_URL = new URL('../prompts/onboarding.md', import.meta.url);
 const CONTEXT_PLACEHOLDERS = [
   'user_profile',
   'macros_today',
@@ -151,10 +152,19 @@ function parseImagePayload(image: ImagePayload): ParsedImage {
 }
 
 export function loadPrompts(): Prompts {
-  return {
-    basePrompt: fs.readFileSync(path.join(PROMPTS_DIR, 'bubby_base.md'), 'utf8'),
-    onboardingPrompt: fs.readFileSync(path.join(PROMPTS_DIR, 'onboarding.md'), 'utf8'),
-  };
+  try {
+    return {
+      basePrompt: fs.readFileSync(BASE_PROMPT_URL, 'utf8'),
+      onboardingPrompt: fs.readFileSync(ONBOARDING_PROMPT_URL, 'utf8'),
+    };
+  } catch {
+    const promptsDir = path.resolve(__dirname, '../prompts');
+
+    return {
+      basePrompt: fs.readFileSync(path.join(promptsDir, 'bubby_base.md'), 'utf8'),
+      onboardingPrompt: fs.readFileSync(path.join(promptsDir, 'onboarding.md'), 'utf8'),
+    };
+  }
 }
 
 export function renderSystemPrompt({

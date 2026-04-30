@@ -84,3 +84,64 @@ test('vercel chat handler rejects missing message and image', async () => {
   assert.equal(response.statusCode, 400);
   assert.deepEqual(response.json(), { error: 'message is required' });
 });
+
+test('vercel chat handler returns 405 for GET without loading prompts', async () => {
+  let promptLoaderWasCalled = false;
+  const handler = createVercelChatHandler({
+    claudeClient: {
+      createMessage: async () => {
+        throw new Error('should not be called');
+      },
+    },
+    loadPrompts: () => {
+      promptLoaderWasCalled = true;
+      throw new Error('should not load prompts for GET');
+    },
+  });
+  const response = createMockResponse();
+
+  await handler({ method: 'GET' }, response);
+
+  assert.equal(response.statusCode, 405);
+  assert.deepEqual(response.json(), { error: 'method not allowed' });
+  assert.equal(promptLoaderWasCalled, false);
+});
+
+test('vercel chat handler lazily loads prompts for valid POST requests', async () => {
+  let promptLoaderWasCalled = false;
+  let capturedRequest;
+  const handler = createVercelChatHandler({
+    claudeClient: {
+      createMessage: async (request) => {
+        capturedRequest = request;
+        return {
+          reply: 'lazy prompt worked.',
+          raw_usage: { input_tokens: 10, output_tokens: 4 },
+        };
+      },
+    },
+    loadPrompts: () => {
+      promptLoaderWasCalled = true;
+      return {
+        basePrompt: 'lazy profile: {{user_profile}}',
+        onboardingPrompt: '',
+      };
+    },
+  });
+  const response = createMockResponse();
+
+  await handler(
+    {
+      method: 'POST',
+      body: {
+        message: 'hi',
+        context: { user_profile: { name: 'Tim' } },
+      },
+    },
+    response,
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(promptLoaderWasCalled, true);
+  assert.match(capturedRequest.system, /lazy profile: \{"name":"Tim"\}/);
+});

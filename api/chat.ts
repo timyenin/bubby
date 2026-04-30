@@ -5,7 +5,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createClaudeClient, type ClaudeClient, type ClaudeMessageBlock } from '../server/claude.ts';
 import {
   buildUserContent,
-  loadPrompts,
+  loadPrompts as loadPromptFiles,
   renderSystemPrompt,
   type ChatContextPayload,
   type Prompts,
@@ -31,6 +31,7 @@ interface SizedError extends Error {
 export interface CreateVercelChatHandlerOptions {
   claudeClient?: ClaudeClient;
   prompts?: Prompts;
+  loadPrompts?: () => Prompts;
 }
 
 export type VercelChatHandler = (
@@ -112,7 +113,8 @@ async function readRequestBody(request: VercelLikeRequest): Promise<VercelReques
 
 export function createVercelChatHandler({
   claudeClient = createClaudeClient(),
-  prompts = loadPrompts(),
+  prompts,
+  loadPrompts = loadPromptFiles,
 }: CreateVercelChatHandlerOptions = {}): VercelChatHandler {
   return async function chatHandler(request, response) {
     if (request.method && request.method !== 'POST') {
@@ -141,9 +143,19 @@ export function createVercelChatHandler({
     }
 
     const isOnboarding = Boolean(context.is_onboarding ?? body?.is_onboarding);
+    let resolvedPrompts: Prompts;
+
+    try {
+      resolvedPrompts = prompts ?? loadPrompts();
+    } catch (error) {
+      console.error('Claude Vercel chat function failed to load prompts:', error);
+      sendJson(response, 500, { error: 'Claude API request failed' });
+      return;
+    }
+
     const system = renderSystemPrompt({
-      basePrompt: prompts.basePrompt,
-      onboardingPrompt: prompts.onboardingPrompt,
+      basePrompt: resolvedPrompts.basePrompt,
+      onboardingPrompt: resolvedPrompts.onboardingPrompt,
       context,
       isOnboarding,
     });

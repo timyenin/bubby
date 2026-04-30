@@ -1,6 +1,14 @@
 server/app.js
+server/app.ts
 server/index.js
+server/index.ts
 server/**/*.test.js
+server/**/*.test.ts
+api/**/*.test.js
+api/**/*.test.ts
+src/**/*.test.js
+src/**/*.test.ts
 design/
 qa-*.png
 *.test.js
+*.test.ts
