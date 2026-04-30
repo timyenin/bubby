@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createVercelChatHandler } from './chat.js';
+import { createVercelChatHandler } from './chat.ts';
 
 function createMockResponse() {
   return {
