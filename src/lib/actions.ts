@@ -19,6 +19,7 @@ export type ActionType =
   | 'set_workout_day'
   | 'update_pantry'
   | 'update_rule'
+  | 'update_macros'
   | 'onboarding_complete';
 
 export interface ActionData {
@@ -32,6 +33,9 @@ export interface ActionData {
   removed?: unknown[];
   add?: unknown[];
   remove?: unknown[];
+  rest_day?: Partial<Record<keyof MacroTotals, number | string>>;
+  workout_day?: Partial<Record<keyof MacroTotals, number | string>>;
+  calorie_floor?: number | string;
   profile?: unknown;
 }
 
@@ -96,6 +100,19 @@ function normalizeMacros(macros: ActionData['macros'] = {}): MacroTotals {
     },
     { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 },
   );
+}
+
+function normalizeMacroUpdates(macros: ActionData['rest_day'] = {}): Partial<MacroTotals> {
+  return MACRO_KEYS.reduce<Partial<MacroTotals>>((updates, key) => {
+    if (Object.hasOwn(macros ?? {}, key)) {
+      const value = Number(macros?.[key]);
+      if (Number.isFinite(value)) {
+        updates[key] = value;
+      }
+    }
+
+    return updates;
+  }, {});
 }
 
 function sumMealTotals(meals: Meal[]): MacroTotals {
@@ -203,6 +220,10 @@ function applyUpdatePantry(
   });
 }
 
+function emptyMacros(): MacroTotals {
+  return { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
+}
+
 function applyUpdateRule(action: ParsedAction): UserProfile | null {
   const profile = getUserProfile();
   if (!profile) {
@@ -227,6 +248,36 @@ function applyUpdateRule(action: ParsedAction): UserProfile | null {
     ...profile,
     established_rules: nextRules,
   });
+}
+
+function applyUpdateMacros(action: ParsedAction): UserProfile | null {
+  const profile = getUserProfile();
+  if (!profile) {
+    return null;
+  }
+
+  const existingTargets = profile.macro_targets ?? {
+    rest_day: emptyMacros(),
+    workout_day: emptyMacros(),
+  };
+  const calorieFloor = Number(action.data?.calorie_floor);
+  const hasCalorieFloor = Object.hasOwn(action.data ?? {}, 'calorie_floor') && Number.isFinite(calorieFloor);
+  const nextProfile: UserProfile = {
+    ...profile,
+    macro_targets: {
+      rest_day: {
+        ...existingTargets.rest_day,
+        ...normalizeMacroUpdates(action.data?.rest_day),
+      },
+      workout_day: {
+        ...existingTargets.workout_day,
+        ...normalizeMacroUpdates(action.data?.workout_day),
+      },
+    },
+    calorie_floor: hasCalorieFloor ? calorieFloor : profile.calorie_floor,
+  };
+
+  return setUserProfile(nextProfile);
 }
 
 function isActionShape(value: unknown): value is { type: unknown; data?: unknown } {
@@ -264,6 +315,8 @@ export function applyAction(
       return applyUpdatePantry(action, options);
     case 'update_rule':
       return applyUpdateRule(action);
+    case 'update_macros':
+      return applyUpdateMacros(action);
     case 'onboarding_complete':
       return null;
     default:

@@ -569,15 +569,52 @@ button {
   font-size: 0.88rem;
 }
 
-.macro-grid p {
-  margin-top: 6px;
-  color: #4c3f67;
-  font-size: 1.2rem;
-  font-weight: 700;
+.macro-input-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 8px;
 }
 
-.macro-grid span,
+.macro-input-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  color: #6c5b85;
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.macro-input-row-primary {
+  margin-top: 8px;
+}
+
+.macro-input-row input,
+.reveal-floor input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid rgba(151, 118, 195, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 250, 255, 0.82);
+  color: #4c3f67;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 6px 4px;
+  text-align: center;
+}
+
+.macro-input-row-primary input {
+  font-size: 1.08rem;
+}
+
 .reveal-floor {
+  display: grid;
+  grid-template-columns: 1fr 84px;
+  align-items: center;
+  gap: 10px;
   color: #6c5b85;
   font-size: 0.82rem;
   line-height: 1.25;

@@ -231,6 +231,73 @@ test('update_rule adds and removes established rules without duplicates', () => 
   assert.deepEqual(getUserProfile().established_rules, ['no peanuts', 'pack lunch']);
 });
 
+test('update_macros with full workout and rest day data updates the profile', () => {
+  setUserProfile({
+    name: 'Tim',
+    current_weight_lbs: 165,
+    established_rules: [],
+    macro_targets: {
+      rest_day: { calories: 2100, protein_g: 165, carbs_g: 220, fat_g: 58 },
+      workout_day: { calories: 2300, protein_g: 165, carbs_g: 270, fat_g: 62 },
+    },
+    calorie_floor: 1800,
+  });
+
+  const result = applyAction({
+    type: 'update_macros',
+    data: {
+      rest_day: { calories: 2000, protein_g: 170, carbs_g: 190, fat_g: 60 },
+      workout_day: { calories: 2200, protein_g: 170, carbs_g: 240, fat_g: 70 },
+      calorie_floor: 1750,
+    },
+  });
+
+  assert.deepEqual(result.macro_targets, {
+    rest_day: { calories: 2000, protein_g: 170, carbs_g: 190, fat_g: 60 },
+    workout_day: { calories: 2200, protein_g: 170, carbs_g: 240, fat_g: 70 },
+  });
+  assert.equal(result.calorie_floor, 1750);
+  assert.deepEqual(getUserProfile().macro_targets, result.macro_targets);
+});
+
+test('update_macros with partial data merges without overwriting workout day', () => {
+  setUserProfile({
+    name: 'Tim',
+    current_weight_lbs: 165,
+    established_rules: [],
+    macro_targets: {
+      rest_day: { calories: 2100, protein_g: 165, carbs_g: 220, fat_g: 58 },
+      workout_day: { calories: 2300, protein_g: 165, carbs_g: 270, fat_g: 62 },
+    },
+    calorie_floor: 1800,
+  });
+
+  applyAction({
+    type: 'update_macros',
+    data: {
+      rest_day: { calories: 2050, carbs_g: 200 },
+    },
+  });
+
+  assert.deepEqual(getUserProfile().macro_targets, {
+    rest_day: { calories: 2050, protein_g: 165, carbs_g: 200, fat_g: 58 },
+    workout_day: { calories: 2300, protein_g: 165, carbs_g: 270, fat_g: 62 },
+  });
+  assert.equal(getUserProfile().calorie_floor, 1800);
+});
+
+test('update_macros without a profile in storage returns null', () => {
+  const result = applyAction({
+    type: 'update_macros',
+    data: {
+      rest_day: { calories: 2050 },
+    },
+  });
+
+  assert.equal(result, null);
+  assert.equal(getUserProfile(), null);
+});
+
 test('applyActions is idempotent for set-like updates and log_meal is intentionally additive', () => {
   setPantry({
     items: [{ name: 'eggs', category: 'protein', always: true }],

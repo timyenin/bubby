@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 
 import HomeScreen from './HomeScreen.tsx';
 import {
@@ -34,8 +34,11 @@ interface OnboardingProps {
 
 interface RevealProps {
   plan: PendingPlan;
-  onConfirm: () => void;
+  onConfirm: (reveal: PendingPlan['reveal']) => void;
 }
+
+type MacroField = 'calories' | 'protein_g' | 'carbs_g' | 'fat_g';
+type MacroTarget = PendingPlan['reveal']['rest_day'];
 
 function createMessage(role: ChatMessage['role'], content: string): OnboardingMessage {
   return {
@@ -50,8 +53,84 @@ function historyForApi(messages: OnboardingMessage[]): Array<Pick<ChatMessage, '
   return messages.map(({ role, content }) => ({ role, content }));
 }
 
+function sanitizeNumberInput(value: string): number {
+  const nextValue = Number(value);
+  return Number.isFinite(nextValue) ? Math.max(0, Math.round(nextValue)) : 0;
+}
+
 function Reveal({ plan, onConfirm }: RevealProps) {
-  const { rest_day: restDay, workout_day: workoutDay, calorie_floor: floor } = plan.reveal;
+  const [restDay, setRestDay] = useState<MacroTarget>(() => ({ ...plan.reveal.rest_day }));
+  const [workoutDay, setWorkoutDay] = useState<MacroTarget>(() => ({ ...plan.reveal.workout_day }));
+  const [calorieFloor, setCalorieFloor] = useState(plan.reveal.calorie_floor);
+
+  function updateTarget(
+    setter: Dispatch<SetStateAction<MacroTarget>>,
+    field: MacroField,
+    value: string,
+  ) {
+    setter((currentTarget) => ({
+      ...currentTarget,
+      [field]: sanitizeNumberInput(value),
+    }));
+  }
+
+  function renderMacroInputs(
+    label: string,
+    target: MacroTarget,
+    setter: Dispatch<SetStateAction<MacroTarget>>,
+  ) {
+    return (
+      <article>
+        <h3>{label}</h3>
+        <label className="macro-input-row macro-input-row-primary">
+          <span>cal</span>
+          <input
+            aria-label={`${label} day calories`}
+            type="number"
+            min="0"
+            inputMode="numeric"
+            value={target.calories}
+            onChange={(event) => updateTarget(setter, 'calories', event.target.value)}
+          />
+        </label>
+        <div className="macro-input-grid">
+          <label className="macro-input-row">
+            <span>p</span>
+            <input
+              aria-label={`${label} day protein grams`}
+              type="number"
+              min="0"
+              inputMode="numeric"
+              value={target.protein_g}
+              onChange={(event) => updateTarget(setter, 'protein_g', event.target.value)}
+            />
+          </label>
+          <label className="macro-input-row">
+            <span>c</span>
+            <input
+              aria-label={`${label} day carb grams`}
+              type="number"
+              min="0"
+              inputMode="numeric"
+              value={target.carbs_g}
+              onChange={(event) => updateTarget(setter, 'carbs_g', event.target.value)}
+            />
+          </label>
+          <label className="macro-input-row">
+            <span>f</span>
+            <input
+              aria-label={`${label} day fat grams`}
+              type="number"
+              min="0"
+              inputMode="numeric"
+              value={target.fat_g}
+              onChange={(event) => updateTarget(setter, 'fat_g', event.target.value)}
+            />
+          </label>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <div className="reveal-backdrop" role="dialog" aria-modal="true" aria-label="daily plan">
@@ -59,19 +138,29 @@ function Reveal({ plan, onConfirm }: RevealProps) {
         <p className="reveal-kicker">daily plan</p>
         <h2>bubby's first guess</h2>
         <div className="macro-grid" aria-label="macro targets">
-          <article>
-            <h3>rest</h3>
-            <p>{restDay.calories} cal</p>
-            <span>{restDay.protein_g}p / {restDay.carbs_g}c / {restDay.fat_g}f</span>
-          </article>
-          <article>
-            <h3>workout</h3>
-            <p>{workoutDay.calories} cal</p>
-            <span>{workoutDay.protein_g}p / {workoutDay.carbs_g}c / {workoutDay.fat_g}f</span>
-          </article>
+          {renderMacroInputs('rest', restDay, setRestDay)}
+          {renderMacroInputs('workout', workoutDay, setWorkoutDay)}
         </div>
-        <p className="reveal-floor">calorie floor: {floor}</p>
-        <button className="reveal-button" type="button" onClick={onConfirm}>
+        <label className="reveal-floor">
+          <span>calorie floor</span>
+          <input
+            aria-label="calorie floor"
+            type="number"
+            min="0"
+            inputMode="numeric"
+            value={calorieFloor}
+            onChange={(event) => setCalorieFloor(sanitizeNumberInput(event.target.value))}
+          />
+        </label>
+        <button
+          className="reveal-button"
+          type="button"
+          onClick={() => onConfirm({
+            rest_day: restDay,
+            workout_day: workoutDay,
+            calorie_floor: calorieFloor,
+          })}
+        >
           looks good
         </button>
       </section>
@@ -147,13 +236,21 @@ function Onboarding({ onComplete }: OnboardingProps) {
     }
   }
 
-  function finishOnboarding() {
+  function finishOnboarding(reveal: PendingPlan['reveal']) {
     if (!pendingPlan) {
       return;
     }
 
     const closingMessage = createMessage('assistant', ONBOARDING_HOME_CLOSING_LINE);
-    setUserProfile(pendingPlan.profile);
+    const finalProfile = {
+      ...pendingPlan.profile,
+      macro_targets: {
+        rest_day: reveal.rest_day,
+        workout_day: reveal.workout_day,
+      },
+      calorie_floor: reveal.calorie_floor,
+    };
+    setUserProfile(finalProfile);
     setPantry(pendingPlan.pantry);
     setConversationHistory({
       messages: [...pendingPlan.messages, closingMessage].map(({ role, content, timestamp }) => ({
