@@ -9,6 +9,7 @@
     "dev:server": "node --watch server/index.ts",
     "start": "node server/index.ts",
     "test": "node --test",
+    "typecheck": "tsc --noEmit",
     "build": "vite build",
     "preview": "vite preview"
   },

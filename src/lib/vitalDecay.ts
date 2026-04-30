@@ -10,20 +10,12 @@ import {
   type UserProfile,
   type VitalName,
 } from './storage.ts';
+import type { ParsedAction } from './actions.ts';
 
 export const CALORIE_FLOOR_PENALTY_FLAG = 'calorie_floor_penalty_applied';
 export const PROTEIN_TARGET_REWARD_FLAG = 'protein_target_vitals_awarded';
 
-interface ActionData {
-  date?: string;
-  macros?: { protein_g?: number | string };
-  is_workout_day?: boolean;
-}
-
-interface VitalAction {
-  type?: string;
-  data?: ActionData;
-}
+type VitalAction = Partial<ParsedAction>;
 
 type VitalDeltas = Partial<Record<VitalName, number>>;
 

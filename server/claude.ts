@@ -68,7 +68,7 @@ export function createClaudeClient(): ClaudeClient {
 
       return {
         reply: collectTextContent(response.content),
-        raw_usage: (response.usage ?? null) as ClaudeUsage | null,
+        raw_usage: (response.usage ?? null) as unknown as ClaudeUsage | null,
       };
     },
   };
