@@ -1,4 +1,26 @@
-import { useEffect, useRef, useState } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from 'react';
+
+interface AttachmentPreview {
+  url: string;
+  name: string;
+}
+
+interface ChatBarProps {
+  value?: string;
+  onChange?: (value: string) => void;
+  onSubmit?: () => void;
+  onAttachmentChange?: (file: File | null) => void;
+  attachmentClearSignal?: number;
+  disabled?: boolean;
+  isSending?: boolean;
+  placeholder?: string;
+}
 
 function ChatBar({
   value = '',
@@ -9,9 +31,9 @@ function ChatBar({
   disabled = true,
   isSending = false,
   placeholder = 'Type a message...',
-}) {
-  const fileInputRef = useRef(null);
-  const [attachmentPreview, setAttachmentPreview] = useState(null);
+}: ChatBarProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<AttachmentPreview | null>(null);
   const canAttach = !disabled && !isSending && Boolean(onAttachmentChange);
   const hasAttachment = Boolean(attachmentPreview);
   const canSend = !disabled && !isSending && (value.trim().length > 0 || hasAttachment);
@@ -33,13 +55,16 @@ function ChatBar({
     }
   }, [attachmentClearSignal]);
 
-  useEffect(() => () => {
-    if (attachmentPreview?.url) {
-      URL.revokeObjectURL(attachmentPreview.url);
-    }
-  }, [attachmentPreview]);
+  useEffect(
+    () => () => {
+      if (attachmentPreview?.url) {
+        URL.revokeObjectURL(attachmentPreview.url);
+      }
+    },
+    [attachmentPreview],
+  );
 
-  function handleSubmit(event) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (canSend) {
@@ -61,7 +86,7 @@ function ChatBar({
     }
   }
 
-  function handleAttachmentChange(event) {
+  function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
       return;

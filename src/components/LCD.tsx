@@ -1,4 +1,17 @@
-import BubbySprite from './BubbySprite.jsx';
+import type { KeyboardEvent } from 'react';
+
+import BubbySprite from './BubbySprite.tsx';
+import type { AnimationName } from '../lib/animationState.ts';
+
+interface LCDProps {
+  onActivate?: () => void;
+  spriteAnimated?: boolean;
+  hint?: string | null;
+  animationName?: AnimationName;
+  animationPlaybackId?: number;
+  animationLoop?: boolean;
+  onAnimationComplete?: () => void;
+}
 
 function LCD({
   onActivate,
@@ -8,17 +21,17 @@ function LCD({
   animationPlaybackId = 0,
   animationLoop = true,
   onAnimationComplete,
-}) {
+}: LCDProps) {
   const isInteractive = typeof onActivate === 'function';
 
-  function handleKeyDown(event) {
+  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
     if (!isInteractive) {
       return;
     }
 
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      onActivate();
+      onActivate?.();
     }
   }
 

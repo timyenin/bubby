@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
 
-import ChatBar from './ChatBar.jsx';
-import ChatMessages from './ChatMessages.jsx';
-import LCD from './LCD.jsx';
-import VitalBars from './VitalBars.jsx';
+import ChatBar from './ChatBar.tsx';
+import ChatMessages, { type DisplayMessage } from './ChatMessages.tsx';
+import LCD from './LCD.tsx';
+import VitalBars from './VitalBars.tsx';
 import {
   applyActions,
   parseActions,
@@ -15,9 +20,11 @@ import {
   enqueueReactiveAnimations,
   finishCurrentAnimation,
   syncBaseAnimation,
+  type AnimationName,
+  type AnimationState,
 } from '../lib/animationState.ts';
 import { buildChatContextFromStorage } from '../lib/chatContext.ts';
-import { todayString } from '../lib/dates.js';
+import { todayString } from '../lib/dates.ts';
 import { processImageForUpload } from '../lib/imageProcessing.ts';
 import { ONBOARDING_HOME_CLOSING_LINE } from '../lib/onboarding.ts';
 import {
@@ -27,17 +34,53 @@ import {
   getDailyLog,
   getUserProfile,
   setBubbyState,
+  type ChatMessage,
+  type ConversationHistory,
 } from '../lib/storage.ts';
 import {
   applyActionsVitalEffects,
   applyVitalDecay,
 } from '../lib/vitalDecay.ts';
 
-function dataUrlToBase64(dataUrl) {
+interface LcdPropsShape {
+  onActivate?: () => void;
+  spriteAnimated?: boolean;
+  hint?: string | null;
+  animationName?: AnimationName;
+  animationPlaybackId?: number;
+  animationLoop?: boolean;
+  onAnimationComplete?: () => void;
+}
+
+interface ChatBarPropsShape {
+  value?: string;
+  onChange?: (value: string) => void;
+  onSubmit?: () => void;
+  onAttachmentChange?: (file: File | null) => void;
+  attachmentClearSignal?: number;
+  disabled?: boolean;
+  isSending?: boolean;
+  placeholder?: string;
+}
+
+export interface HomeScreenProps {
+  messages?: DisplayMessage[];
+  initialMessages?: ChatMessage[] | DisplayMessage[];
+  chatBarProps?: ChatBarPropsShape;
+  lcdProps?: LcdPropsShape;
+  children?: ReactNode;
+  ariaLabel?: string;
+}
+
+function dataUrlToBase64(dataUrl: string): string {
   return dataUrl.replace(/^data:[^;,]+;base64,/s, '');
 }
 
-function createMessage(role, content, extras = {}) {
+function createMessage(
+  role: ChatMessage['role'],
+  content: string,
+  extras: Partial<ChatMessage> = {},
+): ChatMessage {
   return {
     role,
     content,
@@ -46,10 +89,12 @@ function createMessage(role, content, extras = {}) {
   };
 }
 
-function homeVisibleMessages(historyOrMessages) {
-  const messages = Array.isArray(historyOrMessages)
-    ? historyOrMessages
-    : historyOrMessages?.messages ?? [];
+function homeVisibleMessages(
+  historyOrMessages: ConversationHistory | ChatMessage[] | DisplayMessage[] | null | undefined,
+): DisplayMessage[] {
+  const messages: DisplayMessage[] = Array.isArray(historyOrMessages)
+    ? (historyOrMessages as DisplayMessage[])
+    : ((historyOrMessages?.messages ?? []) as DisplayMessage[]);
   let startIndex = -1;
 
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -70,7 +115,7 @@ function readAnimationInputs() {
   };
 }
 
-function buildInitialAnimationState() {
+function buildInitialAnimationState(): AnimationState {
   const inputs = readAnimationInputs();
   const initialState = syncBaseAnimation(createAnimationState(), inputs);
 
@@ -84,7 +129,7 @@ function buildInitialAnimationState() {
   return initialState;
 }
 
-function persistAnimationName(animationName) {
+function persistAnimationName(animationName: AnimationName) {
   const bubbyState = getBubbyState();
 
   if (!bubbyState || bubbyState.current_animation === animationName) {
@@ -104,16 +149,16 @@ function HomeScreen({
   lcdProps,
   children,
   ariaLabel = 'bubby home screen',
-}) {
+}: HomeScreenProps) {
   const isControlledChat = Boolean(chatBarProps);
-  const [homeMessages, setHomeMessages] = useState(() =>
+  const [homeMessages, setHomeMessages] = useState<DisplayMessage[]>(() =>
     homeVisibleMessages(initialMessages),
   );
   const [inputValue, setInputValue] = useState('');
-  const [attachedImageFile, setAttachedImageFile] = useState(null);
+  const [attachedImageFile, setAttachedImageFile] = useState<File | null>(null);
   const [attachmentClearSignal, setAttachmentClearSignal] = useState(0);
   const [isSending, setIsSending] = useState(false);
-  const [animationState, setAnimationState] = useState(buildInitialAnimationState);
+  const [animationState, setAnimationState] = useState<AnimationState>(buildInitialAnimationState);
   const [vitalBarsRefreshKey, setVitalBarsRefreshKey] = useState(0);
 
   const syncAnimationBaseFromStorage = useCallback(() => {
@@ -257,8 +302,8 @@ function HomeScreen({
   }
 
   const resolvedMessages = isControlledChat ? messages : homeMessages;
-  const resolvedLcdProps = isControlledChat
-    ? lcdProps
+  const resolvedLcdProps: LcdPropsShape = isControlledChat
+    ? lcdProps ?? {}
     : {
         ...lcdProps,
         animationName: animationState.currentAnimation,
@@ -266,8 +311,8 @@ function HomeScreen({
         animationLoop: !animationState.isPlayingOneShot,
         onAnimationComplete: handleAnimationComplete,
       };
-  const resolvedChatBarProps = isControlledChat
-    ? chatBarProps
+  const resolvedChatBarProps: ChatBarPropsShape = isControlledChat
+    ? chatBarProps ?? {}
     : {
         value: inputValue,
         onChange: setInputValue,

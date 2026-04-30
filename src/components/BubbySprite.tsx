@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 
 import {
   getActionFrameDelayMs,
@@ -6,10 +6,32 @@ import {
   getNextIdleFrameIndex,
   getSpriteBackgroundPositionPercent,
 } from '../lib/idleAnimation.ts';
-import { loadSpriteManifest, resolveAnimationSheet } from '../lib/spriteManifest.ts';
+import {
+  loadSpriteManifest,
+  resolveAnimationSheet,
+  type ResolvedAnimationSheet,
+  type SpriteManifest,
+} from '../lib/spriteManifest.ts';
+import type { AnimationName } from '../lib/animationState.ts';
 
 const IDLE_ANIMATION = 'idle';
 const SPRITE_NATIVE_SCALE = 4;
+
+interface BubbySpriteProps {
+  animated?: boolean;
+  animationName?: AnimationName;
+  playbackId?: number;
+  loop?: boolean;
+  onComplete?: (animationName: AnimationName, playbackId: number) => void;
+}
+
+type SpriteCSS = CSSProperties & {
+  '--sprite-width'?: string;
+  '--sprite-height'?: string;
+  '--sprite-native-scale'?: number;
+  '--sprite-sheet-frame-count'?: number;
+  '--sprite-position-x'?: string;
+};
 
 function BubbySprite({
   animated = true,
@@ -17,12 +39,12 @@ function BubbySprite({
   playbackId = 0,
   loop = true,
   onComplete,
-}) {
+}: BubbySpriteProps) {
   const normalizedPlaybackId = Number.isFinite(Number(playbackId))
     ? Number(playbackId)
     : 0;
   const playbackKey = `${animationName}:${normalizedPlaybackId}`;
-  const [manifest, setManifest] = useState(null);
+  const [manifest, setManifest] = useState<SpriteManifest | null>(null);
   const [frameIndex, setFrameIndex] = useState(0);
 
   useEffect(() => {
@@ -47,7 +69,7 @@ function BubbySprite({
     };
   }, []);
 
-  const animationSheet = useMemo(() => {
+  const animationSheet = useMemo<ResolvedAnimationSheet | null>(() => {
     if (!manifest) {
       return null;
     }
@@ -60,30 +82,27 @@ function BubbySprite({
       return undefined;
     }
 
-    const timeoutId = window.setTimeout(() => {
-      if (!loop && frameIndex >= animationSheet.frameCount - 1) {
-        onComplete?.(animationName, normalizedPlaybackId);
-        return;
-      }
+    const timeoutId = window.setTimeout(
+      () => {
+        if (!loop && frameIndex >= animationSheet.frameCount - 1) {
+          onComplete?.(animationName, normalizedPlaybackId);
+          return;
+        }
 
-      setFrameIndex((currentFrame) =>
-        getNextIdleFrameIndex(currentFrame, animationSheet.frameCount),
-      );
-    }, loop ? getIdleFrameDelayMs(frameIndex) : getActionFrameDelayMs());
+        setFrameIndex((currentFrame) =>
+          getNextIdleFrameIndex(currentFrame, animationSheet.frameCount),
+        );
+      },
+      loop ? getIdleFrameDelayMs(frameIndex) : getActionFrameDelayMs(),
+    );
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [
-    animated,
-    playbackKey,
-    animationSheet,
-    frameIndex,
-    loop,
-    onComplete,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animated, playbackKey, animationSheet, frameIndex, loop, onComplete]);
 
-  const spriteStyle = useMemo(() => {
+  const spriteStyle = useMemo<SpriteCSS | undefined>(() => {
     if (!animationSheet) {
       return undefined;
     }

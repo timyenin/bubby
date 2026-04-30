@@ -1,21 +1,43 @@
 import { useState } from 'react';
 
-import HomeScreen from './HomeScreen.jsx';
+import HomeScreen from './HomeScreen.tsx';
 import {
   buildOnboardingPlan,
   ONBOARDING_HOME_CLOSING_LINE,
   ONBOARDING_OPENING_LINE,
   parseOnboardingCompleteAction,
   stripActionEnvelopes,
+  type OnboardingPlan,
+  type OnboardingProfileData,
 } from '../lib/onboarding.ts';
 import {
   setConversationHistory,
   setOnboardingComplete,
   setPantry,
   setUserProfile,
+  type ChatMessage,
 } from '../lib/storage.ts';
 
-function createMessage(role, content) {
+interface OnboardingMessage extends ChatMessage {
+  id: string;
+}
+
+type OnboardingPhase = 'hatch' | 'chat' | 'reveal';
+
+interface PendingPlan extends OnboardingPlan {
+  messages: OnboardingMessage[];
+}
+
+interface OnboardingProps {
+  onComplete: (closingMessage: ChatMessage) => void;
+}
+
+interface RevealProps {
+  plan: PendingPlan;
+  onConfirm: () => void;
+}
+
+function createMessage(role: ChatMessage['role'], content: string): OnboardingMessage {
   return {
     id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     role,
@@ -24,11 +46,11 @@ function createMessage(role, content) {
   };
 }
 
-function historyForApi(messages) {
+function historyForApi(messages: OnboardingMessage[]): Array<Pick<ChatMessage, 'role' | 'content'>> {
   return messages.map(({ role, content }) => ({ role, content }));
 }
 
-function Reveal({ plan, onConfirm }) {
+function Reveal({ plan, onConfirm }: RevealProps) {
   const { rest_day: restDay, workout_day: workoutDay, calorie_floor: floor } = plan.reveal;
 
   return (
@@ -57,12 +79,12 @@ function Reveal({ plan, onConfirm }) {
   );
 }
 
-function Onboarding({ onComplete }) {
-  const [phase, setPhase] = useState('hatch');
-  const [messages, setMessages] = useState([]);
+function Onboarding({ onComplete }: OnboardingProps) {
+  const [phase, setPhase] = useState<OnboardingPhase>('hatch');
+  const [messages, setMessages] = useState<OnboardingMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [pendingPlan, setPendingPlan] = useState(null);
+  const [pendingPlan, setPendingPlan] = useState<PendingPlan | null>(null);
 
   function beginConversation() {
     setPhase('chat');
@@ -108,9 +130,9 @@ function Onboarding({ onComplete }) {
       const updatedMessages = [...nextMessages, assistantMessage];
       setMessages(updatedMessages);
 
-      if (action) {
+      if (action?.profile) {
         setPendingPlan({
-          ...buildOnboardingPlan(action.profile),
+          ...buildOnboardingPlan(action.profile as OnboardingProfileData),
           messages: updatedMessages,
         });
         setPhase('reveal');

@@ -1,6 +1,19 @@
 import { useEffect, useRef } from 'react';
 
-const placeholderMessages = [
+export interface DisplayMessage {
+  id?: string;
+  role: 'user' | 'bubby' | 'assistant';
+  text?: string;
+  content?: string;
+  timestamp?: string;
+  thumbnail?: string;
+}
+
+interface ChatMessagesProps {
+  messages?: DisplayMessage[];
+}
+
+const placeholderMessages: DisplayMessage[] = [
   {
     id: 'bubby-placeholder',
     role: 'bubby',
@@ -13,12 +26,12 @@ const placeholderMessages = [
   },
 ];
 
-function messageRoleClass(role) {
+function messageRoleClass(role: DisplayMessage['role']): 'user' | 'bubby' {
   return role === 'user' ? 'user' : 'bubby';
 }
 
-function ChatMessages({ messages }) {
-  const messagesRef = useRef(null);
+function ChatMessages({ messages }: ChatMessagesProps) {
+  const messagesRef = useRef<HTMLElement | null>(null);
   const visibleMessages = messages ?? placeholderMessages;
 
   useEffect(() => {
@@ -49,7 +62,7 @@ function ChatMessages({ messages }) {
                   loading="lazy"
                 />
               ) : null}
-              {message.text ?? message.content ? (
+              {(message.text ?? message.content) ? (
                 <span>{message.text ?? message.content}</span>
               ) : null}
             </div>

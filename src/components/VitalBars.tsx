@@ -4,16 +4,29 @@ import { defaultBubbyState } from '../lib/vitalDecay.ts';
 import {
   getBubbyState,
   setBubbyState,
+  type BubbyState,
+  type VitalName,
 } from '../lib/storage.ts';
 
-const VITALS = [
+interface VitalDescriptor {
+  key: VitalName;
+  label: string;
+}
+
+const VITALS: VitalDescriptor[] = [
   { key: 'vitality', label: 'vit' },
   { key: 'mood', label: 'mood' },
   { key: 'strength', label: 'str' },
   { key: 'energy', label: 'nrg' },
 ];
 
-function readBubbyState() {
+interface VitalBarsProps {
+  refreshKey?: number;
+}
+
+type Tone = 'red' | 'yellow' | 'green';
+
+function readBubbyState(): BubbyState {
   const existingState = getBubbyState();
   if (existingState) {
     return existingState;
@@ -22,7 +35,7 @@ function readBubbyState() {
   return setBubbyState(defaultBubbyState());
 }
 
-function valueTone(value) {
+function valueTone(value: number): Tone {
   if (value < 30) {
     return 'red';
   }
@@ -34,8 +47,8 @@ function valueTone(value) {
   return 'green';
 }
 
-function VitalBars({ refreshKey = 0 }) {
-  const [bubbyState, setLocalBubbyState] = useState(readBubbyState);
+function VitalBars({ refreshKey = 0 }: VitalBarsProps) {
+  const [bubbyState, setLocalBubbyState] = useState<BubbyState>(readBubbyState);
 
   useEffect(() => {
     setLocalBubbyState(readBubbyState());
