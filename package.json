@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"node --watch server/index.js\" \"vite\"",
+    "dev": "concurrently \"node --watch server/index.ts\" \"vite\"",
     "dev:client": "vite",
-    "dev:server": "node --watch server/index.js",
-    "start": "node server/index.js",
+    "dev:server": "node --watch server/index.ts",
+    "start": "node server/index.ts",
     "test": "node --test",
+    "typecheck": "tsc --noEmit",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -20,8 +21,13 @@
     "react-dom": "^19.2.5"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "concurrently": "^9.2.1",
+    "typescript": "^6.0.3",
     "vite": "^8.0.10"
   }
 }
