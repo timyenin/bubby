@@ -1,5 +1,5 @@
 const THEME_KEY = 'bubby:theme';
-const DEFAULT_THEME_ID = 'rainbow';
+const DEFAULT_THEME_ID = 'pink_stars';
 
 export interface CaseTheme {
   id: string;
@@ -12,6 +12,15 @@ export interface CaseTheme {
 }
 
 export const THEMES: CaseTheme[] = [
+  {
+    id: 'pink_stars',
+    name: 'pink stars',
+    backgroundImage: '/assets/themes/pink_stars.png',
+    bezelColor: '#a98bc2',
+    bezelLight: '#c4a8d8',
+    bezelDark: '#7e65a8',
+    caseInk: '#7d65ba',
+  },
   {
     id: 'rainbow',
     name: 'rainbow',

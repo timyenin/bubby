@@ -543,8 +543,8 @@ function HomeScreen({
 
         <section className="bubby-case" aria-label="bubby case">
           <div className={`case-content${isControlledChat ? '' : ' case-content-with-vitals'}`}>
-            <LCD {...resolvedLcdProps} />
             {isControlledChat ? null : <VitalBars refreshKey={vitalBarsRefreshKey} />}
+            <LCD {...resolvedLcdProps} />
             <ChatMessages
               messages={resolvedMessages}
               rollingMessageId={rollingMessageId}

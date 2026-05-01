@@ -28,8 +28,9 @@ test.beforeEach(() => {
   globalThis.localStorage = new MemoryStorage();
 });
 
-test('getActiveTheme defaults to rainbow when no theme is saved', () => {
-  assert.equal(getActiveTheme().id, 'rainbow');
+test('getActiveTheme defaults to pink stars when no theme is saved', () => {
+  assert.equal(getActiveTheme().id, 'pink_stars');
+  assert.equal(getActiveTheme().backgroundImage, '/assets/themes/pink_stars.png');
 });
 
 test('setActiveTheme persists the selected theme id', () => {
@@ -40,9 +41,13 @@ test('setActiveTheme persists the selected theme id', () => {
   assert.equal(getActiveTheme().id, 'rainbow');
 });
 
-test('getActiveTheme falls back to rainbow for unknown saved theme ids', () => {
+test('getActiveTheme falls back to pink stars for unknown saved theme ids', () => {
   globalThis.localStorage.setItem('bubby:theme', 'missing-theme');
 
-  assert.equal(getActiveTheme().id, 'rainbow');
-  assert.equal(THEMES[0].id, 'rainbow');
+  assert.equal(getActiveTheme().id, 'pink_stars');
+  assert.equal(THEMES[0].id, 'pink_stars');
+});
+
+test('THEMES includes rainbow as a non-default alternate theme', () => {
+  assert.ok(THEMES.some((theme) => theme.id === 'rainbow'));
 });
