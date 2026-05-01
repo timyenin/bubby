@@ -25,6 +25,10 @@ import {
   type AnimationName,
   type AnimationState,
 } from '../lib/animationState.ts';
+import {
+  getBubbyColorOption,
+  getNextBubbyColorId,
+} from '../lib/bubbyColors.ts';
 import { buildChatContextFromStorage } from '../lib/chatContext.ts';
 import { todayString } from '../lib/dates.ts';
 import {
@@ -35,10 +39,12 @@ import { processImageForUpload } from '../lib/imageProcessing.ts';
 import { ONBOARDING_HOME_CLOSING_LINE } from '../lib/onboarding.ts';
 import {
   appendMessageToHistory,
+  getBubbyColorId,
   getBubbyState,
   getConversationHistory,
   getDailyLog,
   getUserProfile,
+  setBubbyColorId,
   setBubbyState,
   type ChatMessage,
   type ConversationHistory,
@@ -62,6 +68,7 @@ interface LcdPropsShape {
   animationPlaybackId?: number;
   animationLoop?: boolean;
   onAnimationComplete?: () => void;
+  bubbyFillColor?: string | null;
 }
 
 interface ChatBarPropsShape {
@@ -201,6 +208,9 @@ function HomeScreen({
   const [animationState, setAnimationState] = useState<AnimationState>(buildInitialAnimationState);
   const [vitalBarsRefreshKey, setVitalBarsRefreshKey] = useState(0);
   const [activeTheme, setActiveThemeState] = useState<CaseTheme>(() => getActiveTheme());
+  const [activeBubbyColorId, setActiveBubbyColorId] = useState(() =>
+    getBubbyColorOption(getBubbyColorId()).id,
+  );
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
   const rolloutIntervalRef = useRef<number | null>(null);
   const themeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -334,6 +344,12 @@ function HomeScreen({
     setIsThemePickerOpen(false);
   }
 
+  function cycleBubbyColor() {
+    const nextColorId = getNextBubbyColorId(activeBubbyColorId);
+    setBubbyColorId(nextColorId);
+    setActiveBubbyColorId(nextColorId);
+  }
+
   async function sendHomeMessage() {
     const content = inputValue.trim();
     const imageFiles = attachedImageFiles.slice(0, 4);
@@ -447,10 +463,18 @@ function HomeScreen({
   const resolvedRevealedLength = isControlledChat
     ? controlledRevealedLength
     : homeRevealedLength;
+  const activeBubbyColor = getBubbyColorOption(activeBubbyColorId);
+  const bubbyColorButtonStyle = {
+    '--bubby-color-swatch': activeBubbyColor.fillColor ?? 'transparent',
+  } as CSSProperties & Record<'--bubby-color-swatch', string>;
   const resolvedLcdProps: LcdPropsShape = isControlledChat
-    ? lcdProps ?? {}
+    ? {
+        ...lcdProps,
+        bubbyFillColor: lcdProps?.bubbyFillColor ?? activeBubbyColor.fillColor,
+      }
     : {
         ...lcdProps,
+        bubbyFillColor: lcdProps?.bubbyFillColor ?? activeBubbyColor.fillColor,
         animationName: animationState.currentAnimation,
         animationPlaybackId: animationState.playbackId,
         animationLoop: !animationState.isPlayingOneShot,
@@ -522,7 +546,14 @@ function HomeScreen({
             ) : null}
           </div>
           <h1>bubby</h1>
-          <button className="header-icon-button" type="button" disabled>
+          <button
+            className="header-icon-button bubby-color-button"
+            type="button"
+            aria-label={`bubby color: ${activeBubbyColor.name}. tap to change`}
+            title={`Bubby color: ${activeBubbyColor.name}`}
+            onClick={cycleBubbyColor}
+            style={bubbyColorButtonStyle}
+          >
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
@@ -532,17 +563,13 @@ function HomeScreen({
               strokeLinejoin="round"
               strokeWidth="2"
             >
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 2v3" />
-              <path d="M12 19v3" />
-              <path d="m4.93 4.93 2.12 2.12" />
-              <path d="m16.95 16.95 2.12 2.12" />
-              <path d="M2 12h3" />
-              <path d="M19 12h3" />
-              <path d="m4.93 19.07 2.12-2.12" />
-              <path d="m16.95 7.05 2.12-2.12" />
+              <path d="M12 3a9 9 0 0 0 0 18h1.6a1.7 1.7 0 0 0 1.24-2.86 1.7 1.7 0 0 1 1.24-2.86H18a6 6 0 0 0 0-12h-6Z" />
+              <circle cx="7.7" cy="10.1" r=".7" fill="currentColor" stroke="none" />
+              <circle cx="10.2" cy="7.4" r=".7" fill="currentColor" stroke="none" />
+              <circle cx="13.5" cy="7.2" r=".7" fill="currentColor" stroke="none" />
             </svg>
-            <span className="sr-only">settings</span>
+            <span className="bubby-color-swatch" aria-hidden="true" />
+            <span className="sr-only">change bubby color</span>
           </button>
         </header>
 

@@ -5,7 +5,9 @@ const BUBBY_STATE_KEY = `${KEY_PREFIX}bubby_state`;
 const CONVERSATION_HISTORY_KEY = `${KEY_PREFIX}conversation_history`;
 const ONBOARDING_COMPLETE_KEY = `${KEY_PREFIX}onboarding_complete`;
 const MEMORY_KEY = `${KEY_PREFIX}memory`;
+const BUBBY_COLOR_KEY = `${KEY_PREFIX}bubby_color`;
 const MAX_HISTORY_MESSAGES = 100;
+const DEFAULT_BUBBY_COLOR_ID = 'default';
 
 export type VitalName = 'vitality' | 'mood' | 'strength' | 'energy';
 export type MemoryCategory =
@@ -281,6 +283,18 @@ export function setMemory(memory: BubbyMemory): BubbyMemory {
 
 export function deleteMemory(): void {
   deleteKey(MEMORY_KEY);
+}
+
+export function getBubbyColorId(): string {
+  return getJson<string>(BUBBY_COLOR_KEY, DEFAULT_BUBBY_COLOR_ID);
+}
+
+export function setBubbyColorId(colorId: string): string {
+  return setJson(BUBBY_COLOR_KEY, colorId);
+}
+
+export function deleteBubbyColorId(): void {
+  deleteKey(BUBBY_COLOR_KEY);
 }
 
 export function addMemoryEntry(

@@ -227,6 +227,23 @@ button {
   height: 20px;
 }
 
+.bubby-color-button {
+  position: relative;
+}
+
+.bubby-color-swatch {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  width: 9px;
+  height: 9px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: var(--bubby-color-swatch);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.42);
+  pointer-events: none;
+}
+
 .header-menu {
   position: relative;
   display: grid;

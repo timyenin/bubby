@@ -13,6 +13,7 @@ import {
   type ResolvedAnimationSheet,
   type SpriteManifest,
 } from '../lib/spriteManifest.ts';
+import { recolorSpriteImageData } from '../lib/spriteTint.ts';
 import type { AnimationName } from '../lib/animationState.ts';
 
 const IDLE_ANIMATION = 'idle';
@@ -24,6 +25,7 @@ interface BubbySpriteProps {
   playbackId?: number;
   loop?: boolean;
   onComplete?: (animationName: AnimationName, playbackId: number) => void;
+  fillColor?: string | null;
 }
 
 type SpriteCSS = CSSProperties & {
@@ -40,6 +42,7 @@ function BubbySprite({
   playbackId = 0,
   loop = true,
   onComplete,
+  fillColor = null,
 }: BubbySpriteProps) {
   const normalizedPlaybackId = Number.isFinite(Number(playbackId))
     ? Number(playbackId)
@@ -47,6 +50,7 @@ function BubbySprite({
   const playbackKey = `${animationName}:${normalizedPlaybackId}`;
   const [manifest, setManifest] = useState<SpriteManifest | null>(null);
   const [frameIndex, setFrameIndex] = useState(0);
+  const [tintedSpriteSrc, setTintedSpriteSrc] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +81,65 @@ function BubbySprite({
 
     return resolveAnimationSheet(manifest, animationName);
   }, [animationName, manifest]);
+
+  useEffect(() => {
+    if (!animationSheet?.src || !fillColor) {
+      setTintedSpriteSrc(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const image = new Image();
+
+    image.onload = () => {
+      if (cancelled) {
+        return;
+      }
+
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth || image.width;
+        canvas.height = image.naturalHeight || image.height;
+        const context = canvas.getContext('2d');
+
+        if (!context) {
+          setTintedSpriteSrc(null);
+          return;
+        }
+
+        context.imageSmoothingEnabled = false;
+        context.drawImage(image, 0, 0);
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const [frameWidth, frameHeight] = animationSheet.frameSize;
+        context.putImageData(
+          recolorSpriteImageData(imageData, fillColor, { frameWidth, frameHeight }),
+          0,
+          0,
+        );
+
+        if (!cancelled) {
+          setTintedSpriteSrc(canvas.toDataURL('image/png'));
+        }
+      } catch (error) {
+        console.error('Failed to tint Bubby sprite sheet', error);
+        if (!cancelled) {
+          setTintedSpriteSrc(null);
+        }
+      }
+    };
+
+    image.onerror = () => {
+      if (!cancelled) {
+        setTintedSpriteSrc(null);
+      }
+    };
+
+    image.src = animationSheet.src;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [animationSheet?.src, fillColor]);
 
   useEffect(() => {
     if (!animationSheet) {
@@ -133,9 +196,9 @@ function BubbySprite({
         sheetWidth,
         xOffset: animationSheet.xOffset,
       })}%`,
-      backgroundImage: `url("${animationSheet.src}")`,
+      backgroundImage: `url("${tintedSpriteSrc ?? animationSheet.src}")`,
     };
-  }, [animationSheet, frameIndex]);
+  }, [animationSheet, frameIndex, tintedSpriteSrc]);
 
   if (!animationSheet) {
     return null;

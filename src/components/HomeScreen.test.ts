@@ -35,3 +35,10 @@ test('controlled home screen can receive external reply rollout state', () => {
     /const resolvedRevealedLength = isControlledChat\s*\?\s*controlledRevealedLength\s*:\s*homeRevealedLength;/,
   );
 });
+
+test('home screen uses the top-right header button as a bubby color cycler', () => {
+  assert.match(source, /cycleBubbyColor/);
+  assert.match(source, /aria-label=\{`bubby color:/);
+  assert.match(source, /bubbyFillColor/);
+  assert.doesNotMatch(source, /<button className="header-icon-button" type="button" disabled>/);
+});

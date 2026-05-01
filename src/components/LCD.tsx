@@ -11,6 +11,7 @@ interface LCDProps {
   animationPlaybackId?: number;
   animationLoop?: boolean;
   onAnimationComplete?: () => void;
+  bubbyFillColor?: string | null;
 }
 
 function LCD({
@@ -21,6 +22,7 @@ function LCD({
   animationPlaybackId = 0,
   animationLoop = true,
   onAnimationComplete,
+  bubbyFillColor = null,
 }: LCDProps) {
   const isInteractive = typeof onActivate === 'function';
 
@@ -58,6 +60,7 @@ function LCD({
           playbackId={animationPlaybackId}
           loop={animationLoop}
           onComplete={onAnimationComplete}
+          fillColor={bubbyFillColor}
         />
         {hint ? <p className="lcd-hint">{hint}</p> : null}
       </div>

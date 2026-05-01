@@ -8,6 +8,7 @@ import {
   clearAll,
   deleteDailyLog,
   getMemory,
+  getBubbyColorId,
   deleteUserProfile,
   getDailyLog,
   getOnboardingComplete,
@@ -17,6 +18,7 @@ import {
   removeMemoryByContent,
   removeMemoryEntry,
   setBubbyState,
+  setBubbyColorId,
   setDailyLog,
   setMemory,
   setOnboardingComplete,
@@ -162,6 +164,13 @@ test('appendMessageToHistory persists optional image data on messages', () => {
     thumbnails,
     fullImages,
   });
+});
+
+test('bubby color helpers roundtrip the selected color id', () => {
+  assert.equal(getBubbyColorId(), 'default');
+
+  setBubbyColorId('pastel_mint');
+  assert.equal(getBubbyColorId(), 'pastel_mint');
 });
 
 test('incrementVital clamps vital bars between 0 and 100', () => {
@@ -311,6 +320,7 @@ test('updateMemoryEntry updates content and category and sets updated_at', () =>
 test('clearAll removes only bubby namespaced keys', () => {
   setUserProfile({ name: 'Tim' });
   addMemoryEntry({ content: 'likes rice', category: 'preference' });
+  setBubbyColorId('pastel_lavender');
   setOnboardingComplete(true);
   globalThis.localStorage.setItem('other:key', 'keep');
 
@@ -318,6 +328,7 @@ test('clearAll removes only bubby namespaced keys', () => {
 
   assert.equal(getUserProfile(), null);
   assert.equal(getMemory(), null);
+  assert.equal(getBubbyColorId(), 'default');
   assert.equal(getOnboardingComplete(), false);
   assert.equal(globalThis.localStorage.getItem('other:key'), 'keep');
 });
