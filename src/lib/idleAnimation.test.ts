@@ -35,6 +35,19 @@ test('idle frames loop through manifest frame count', () => {
   assert.equal(getNextIdleFrameIndex(1, 2), 0);
 });
 
+test('idle can choose subtle glance frames from neutral', () => {
+  assert.equal(getNextIdleFrameIndex(0, 5, () => 0.6), 2);
+  assert.equal(getNextIdleFrameIndex(0, 5, () => 0.75), 3);
+  assert.equal(getNextIdleFrameIndex(0, 5, () => 0.95), 4);
+});
+
+test('idle returns to neutral after any glance frame', () => {
+  assert.equal(getNextIdleFrameIndex(1, 5), 0);
+  assert.equal(getNextIdleFrameIndex(2, 5), 0);
+  assert.equal(getNextIdleFrameIndex(3, 5), 0);
+  assert.equal(getNextIdleFrameIndex(4, 5), 0);
+});
+
 test('sprite sheet position maps frame offset onto the combined sheet', () => {
   assert.equal(
     getSpriteBackgroundPositionPercent({

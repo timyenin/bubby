@@ -17,12 +17,13 @@
     0
   ],
   "pixel_grid": "1:1, no antialiasing",
-  "frame_count": 23,
+  "frame_count": 26,
   "animations": {
     "idle": [
       {
         "file": "frames/idle_01.png",
         "index": 1,
+        "look_direction": "neutral",
         "size": [
           48,
           48
@@ -31,6 +32,34 @@
       {
         "file": "frames/idle_02.png",
         "index": 2,
+        "look_direction": "blink",
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/idle_03.png",
+        "index": 3,
+        "look_direction": "left",
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/idle_04.png",
+        "index": 4,
+        "look_direction": "right",
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/idle_05.png",
+        "index": 5,
+        "look_direction": "up",
         "size": [
           48,
           48
@@ -40,7 +69,7 @@
     "idle_sheet": {
       "file": "sheets/idle_sheet.png",
       "size": [
-        96,
+        240,
         48
       ]
     },
@@ -268,15 +297,15 @@
     }
   },
   "all_sheet": {
-    "file": "bubby_all_23_frames_sheet_transparent.png",
+    "file": "bubby_all_26_frames_sheet_transparent.png",
     "size": [
-      1104,
+      1248,
       48
     ]
   },
   "preview_only": [
-    "bubby_all_23_frames_preview_8x_transparent.png",
-    "bubby_all_23_frames_checker_preview_8x.png",
+    "bubby_all_26_frames_preview_8x_transparent.png",
+    "bubby_all_26_frames_checker_preview_8x.png",
     "bubby_animation_contact_checker_preview_8x.png"
   ]
 }

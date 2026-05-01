@@ -3,6 +3,9 @@ const SHORT_FRAME_MS: [number, number] = [150, 300];
 const ACTION_FRAME_MS: [number, number] = [150, 200];
 const SLEEPY_Z_FRAME_INDEX = 1;
 const SLEEPY_Z_HOLD_MS: [number, number] = [2000, 4000];
+const IDLE_BLINK_ROLL = 0.5;
+const IDLE_LOOK_LEFT_ROLL = 0.68;
+const IDLE_LOOK_RIGHT_ROLL = 0.86;
 
 export function getIdleFrameDelayMs(
   frameIndex: number,
@@ -41,12 +44,39 @@ export function getLoopingAnimationFrameDelayMs(
   return getIdleFrameDelayMs(frameIndex, random);
 }
 
-export function getNextIdleFrameIndex(frameIndex: number, frameCount: number): number {
+export function getNextIdleFrameIndex(
+  frameIndex: number,
+  frameCount: number,
+  random: () => number = Math.random,
+): number {
   if (!Number.isInteger(frameCount) || frameCount < 1) {
     return 0;
   }
 
-  return (frameIndex + 1) % frameCount;
+  if (frameCount <= 2) {
+    return (frameIndex + 1) % frameCount;
+  }
+
+  if (frameIndex !== 0) {
+    return 0;
+  }
+
+  const roll = random();
+  const maxFrameIndex = frameCount - 1;
+
+  if (roll < IDLE_BLINK_ROLL) {
+    return Math.min(1, maxFrameIndex);
+  }
+
+  if (roll < IDLE_LOOK_LEFT_ROLL) {
+    return Math.min(2, maxFrameIndex);
+  }
+
+  if (roll < IDLE_LOOK_RIGHT_ROLL) {
+    return Math.min(3, maxFrameIndex);
+  }
+
+  return Math.min(4, maxFrameIndex);
 }
 
 export interface SpriteBackgroundPositionParams {
