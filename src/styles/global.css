@@ -643,13 +643,13 @@ button {
 }
 
 .reveal-panel {
-  width: min(100%, 340px);
+  width: min(100%, 360px);
   border: 1px solid rgba(151, 118, 195, 0.28);
   border-radius: 18px;
   background: rgba(255, 250, 255, 0.92);
   color: #4c3f67;
   font-family: Inter, system-ui, sans-serif;
-  padding: 18px;
+  padding: 16px;
 }
 
 .reveal-kicker,
@@ -676,15 +676,15 @@ button {
 .macro-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin: 16px 0 12px;
+  gap: 8px;
+  margin: 14px 0 12px;
 }
 
 .macro-grid article {
   border: 1px solid rgba(151, 118, 195, 0.24);
   border-radius: 12px;
   background: #fff3d7;
-  padding: 12px;
+  padding: 10px;
 }
 
 .macro-grid h3 {
@@ -694,18 +694,18 @@ button {
 
 .macro-input-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(42px, 1fr));
+  gap: 6px;
   margin-top: 8px;
 }
 
 .macro-input-row {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 0.8rem minmax(42px, 1fr);
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   color: #6c5b85;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   line-height: 1.25;
 }
 
@@ -719,29 +719,39 @@ button {
 
 .macro-input-row input,
 .reveal-floor input {
-  min-width: 36px;
+  min-width: 48px;
   width: 100%;
+  appearance: textfield;
   border: 1px solid rgba(151, 118, 195, 0.28);
   border-radius: 8px;
   background: rgba(255, 250, 255, 0.82);
   color: #4c3f67;
   font-family: Inter, system-ui, sans-serif;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   font-weight: 700;
   line-height: 1;
-  padding: 6px 4px;
+  padding: 7px 5px;
   text-align: center;
+  -moz-appearance: textfield;
+}
+
+.macro-input-row input::-webkit-outer-spin-button,
+.macro-input-row input::-webkit-inner-spin-button,
+.reveal-floor input::-webkit-outer-spin-button,
+.reveal-floor input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
 }
 
 .macro-input-row-primary input {
-  font-size: 1.08rem;
+  font-size: 1rem;
 }
 
 .reveal-floor {
   display: grid;
-  grid-template-columns: 1fr 84px;
+  grid-template-columns: 1fr minmax(96px, 112px);
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   color: #6c5b85;
   font-size: 0.82rem;
   line-height: 1.25;
@@ -766,6 +776,28 @@ button {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   clip-path: inset(50%);
+}
+
+@media (max-width: 430px) {
+  .macro-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin: 12px 0;
+  }
+
+  .macro-input-grid {
+    grid-template-columns: repeat(3, minmax(54px, 1fr));
+    gap: 8px;
+  }
+
+  .macro-input-row {
+    grid-template-columns: 0.8rem minmax(54px, 1fr);
+  }
+
+  .macro-input-row input,
+  .reveal-floor input {
+    min-width: 54px;
+  }
 }
 
 @media (min-width: 720px) {
