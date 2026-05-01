@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -25,6 +26,10 @@ import {
 } from '../lib/animationState.ts';
 import { buildChatContextFromStorage } from '../lib/chatContext.ts';
 import { todayString } from '../lib/dates.ts';
+import {
+  DIALOGUE_CHARACTER_DELAY_MS,
+  getDialogueRolloutDelay,
+} from '../lib/dialogueRollout.ts';
 import { processImageForUpload } from '../lib/imageProcessing.ts';
 import { ONBOARDING_HOME_CLOSING_LINE } from '../lib/onboarding.ts';
 import {
@@ -81,10 +86,13 @@ function createMessage(
   content: string,
   extras: Partial<ChatMessage> = {},
 ): ChatMessage {
+  const timestamp = new Date().toISOString();
+
   return {
+    id: `message_${timestamp.replace(/[^0-9]/g, '')}_${Math.random().toString(36).slice(2)}`,
     role,
     content,
-    timestamp: new Date().toISOString(),
+    timestamp,
     ...extras,
   };
 }
@@ -158,8 +166,57 @@ function HomeScreen({
   const [attachedImageFile, setAttachedImageFile] = useState<File | null>(null);
   const [attachmentClearSignal, setAttachmentClearSignal] = useState(0);
   const [isSending, setIsSending] = useState(false);
+  const [rollingMessageId, setRollingMessageId] = useState<string | null>(null);
+  const [revealedLength, setRevealedLength] = useState(0);
   const [animationState, setAnimationState] = useState<AnimationState>(buildInitialAnimationState);
   const [vitalBarsRefreshKey, setVitalBarsRefreshKey] = useState(0);
+  const rolloutIntervalRef = useRef<number | null>(null);
+
+  function clearRolloutInterval() {
+    if (rolloutIntervalRef.current !== null) {
+      window.clearInterval(rolloutIntervalRef.current);
+      rolloutIntervalRef.current = null;
+    }
+  }
+
+  function startReplyRollout(messageId: string, reply: string): Promise<void> {
+    clearRolloutInterval();
+    setRollingMessageId(messageId);
+    setRevealedLength(0);
+
+    if (!reply) {
+      setRollingMessageId(null);
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      let currentLength = 0;
+      let pauseUntil = 0;
+
+      rolloutIntervalRef.current = window.setInterval(() => {
+        const now = Date.now();
+
+        if (now < pauseUntil) {
+          return;
+        }
+
+        currentLength += 1;
+        setRevealedLength(currentLength);
+
+        if (currentLength >= reply.length) {
+          clearRolloutInterval();
+          setRollingMessageId(null);
+          resolve();
+          return;
+        }
+
+        const nextDelay = getDialogueRolloutDelay(reply, currentLength);
+        if (nextDelay > DIALOGUE_CHARACTER_DELAY_MS) {
+          pauseUntil = now + nextDelay;
+        }
+      }, DIALOGUE_CHARACTER_DELAY_MS);
+    });
+  }
 
   const syncAnimationBaseFromStorage = useCallback(() => {
     setAnimationState((currentState) =>
@@ -204,6 +261,12 @@ function HomeScreen({
       persistAnimationName(animationState.currentAnimation);
     }
   }, [animationState.currentAnimation, isControlledChat]);
+
+  useEffect(() => {
+    return () => {
+      clearRolloutInterval();
+    };
+  }, []);
 
   async function sendHomeMessage() {
     const content = inputValue.trim();
@@ -280,10 +343,12 @@ function HomeScreen({
       }
 
       if (visibleReply) {
+        const assistantMessage = createMessage('assistant', visibleReply);
         const assistantHistory = appendMessageToHistory(
-          createMessage('assistant', visibleReply),
+          assistantMessage,
         );
         setHomeMessages(homeVisibleMessages(assistantHistory));
+        await startReplyRollout(assistantMessage.id ?? assistantMessage.timestamp, visibleReply);
       }
 
       if (processedImage) {
@@ -292,6 +357,9 @@ function HomeScreen({
       }
     } catch (error) {
       console.error('Home chat request failed', error);
+      clearRolloutInterval();
+      setRollingMessageId(null);
+      setRevealedLength(0);
       const errorHistory = appendMessageToHistory(
         createMessage('assistant', 'something glitched. try again?'),
       );
@@ -371,7 +439,11 @@ function HomeScreen({
           <div className={`case-content${isControlledChat ? '' : ' case-content-with-vitals'}`}>
             <LCD {...resolvedLcdProps} />
             {isControlledChat ? null : <VitalBars refreshKey={vitalBarsRefreshKey} />}
-            <ChatMessages messages={resolvedMessages} />
+            <ChatMessages
+              messages={resolvedMessages}
+              rollingMessageId={rollingMessageId}
+              revealedLength={revealedLength}
+            />
             <ChatBar {...resolvedChatBarProps} />
           </div>
         </section>
