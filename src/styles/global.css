@@ -119,11 +119,11 @@ button {
   grid-template-columns: 42px minmax(0, 1fr) 42px;
   align-items: center;
   gap: 10px;
-  min-height: 64px;
-  padding: 10px 14px 8px;
-  border-bottom: 1px solid rgba(151, 118, 195, 0.28);
-  background: rgba(255, 247, 255, 0.3);
-  backdrop-filter: blur(8px);
+  min-height: 54px;
+  padding: 8px 14px 4px;
+  border-bottom: 0;
+  background: transparent;
+  backdrop-filter: none;
   color: var(--case-ink);
   font-family: Inter, system-ui, sans-serif;
 }
@@ -215,14 +215,14 @@ button {
   z-index: 2;
   display: grid;
   grid-template-rows: clamp(230px, 30dvh, 270px) minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 8px;
   height: 100%;
-  padding: 14px 14px 0;
+  padding: 8px 14px 0;
 }
 
 .case-content-with-vitals {
   grid-template-rows: auto clamp(220px, 29dvh, 260px) minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: 7px;
 }
 
 .lcd-shell {
@@ -268,7 +268,7 @@ button {
 .bubby-sprite {
   position: absolute;
   left: 50%;
-  bottom: 10px;
+  bottom: 6px;
   width: var(--sprite-width);
   height: var(--sprite-height);
   transform: translateX(-50%);
