@@ -367,6 +367,20 @@ button {
   gap: 7px;
 }
 
+.message-thumbnail-row {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+}
+
+.message-thumbnail-button {
+  display: block;
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
 .message-thumbnail {
   display: block;
   width: auto;
@@ -374,6 +388,47 @@ button {
   max-height: 80px;
   border-radius: 10px;
   object-fit: cover;
+}
+
+.image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(18, 12, 26, 0.78);
+  padding: 22px;
+}
+
+.image-lightbox-frame {
+  display: grid;
+  max-width: 100%;
+  max-height: 100%;
+  place-items: center;
+}
+
+.image-lightbox-frame img {
+  max-width: min(100%, 92vw);
+  max-height: 88vh;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.image-lightbox-close {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgba(255, 250, 255, 0.28);
+  border-radius: 50%;
+  background: rgba(20, 12, 30, 0.82);
+  color: #fffaff;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .chat-bar {

@@ -133,14 +133,24 @@ test('appendMessageToHistory caps conversation history at 100 messages', () => {
   assert.equal(history.messages.at(-1).content, 'latest');
 });
 
-test('appendMessageToHistory persists optional thumbnail data on messages', () => {
+test('appendMessageToHistory persists optional image data on messages', () => {
   const thumbnail = 'data:image/jpeg;base64,small-thumb';
+  const thumbnails = [
+    'data:image/jpeg;base64,small-thumb-1',
+    'data:image/jpeg;base64,small-thumb-2',
+  ];
+  const fullImages = [
+    'data:image/jpeg;base64,full-image-1',
+    'data:image/jpeg;base64,full-image-2',
+  ];
 
   const history = appendMessageToHistory({
     role: 'user',
     content: 'this is lunch',
     timestamp: '2026-04-28T12:00:00-04:00',
     thumbnail,
+    thumbnails,
+    fullImages,
   });
 
   assert.equal(history.messages.length, 1);
@@ -149,6 +159,8 @@ test('appendMessageToHistory persists optional thumbnail data on messages', () =
     content: 'this is lunch',
     timestamp: '2026-04-28T12:00:00-04:00',
     thumbnail,
+    thumbnails,
+    fullImages,
   });
 });
 

@@ -100,6 +100,8 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   thumbnail?: string;
+  thumbnails?: string[];
+  fullImages?: string[];
 }
 
 export interface ConversationHistory {

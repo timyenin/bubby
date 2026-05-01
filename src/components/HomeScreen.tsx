@@ -287,7 +287,13 @@ function HomeScreen({
         createMessage(
           'user',
           content,
-          processedImages[0] ? { thumbnail: processedImages[0].thumbnail } : {},
+          processedImages[0]
+            ? {
+                thumbnail: processedImages[0].thumbnail,
+                thumbnails: processedImages.map((processedImage) => processedImage.thumbnail),
+                fullImages: processedImages.map((processedImage) => processedImage.fullImage),
+              }
+            : {},
         ),
       );
 
