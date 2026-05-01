@@ -20,3 +20,18 @@ test('home screen renders vital bars before the LCD in the case layout', () => {
   assert.ok(lcdIndex >= 0);
   assert.ok(vitalBarsIndex < lcdIndex);
 });
+
+test('controlled home screen can receive external reply rollout state', () => {
+  assert.match(source, /rollingMessageId\?: string \| null/);
+  assert.match(source, /revealedLength\?: number/);
+  assert.match(source, /resolvedRollingMessageId/);
+  assert.match(source, /resolvedRevealedLength/);
+  assert.match(
+    source,
+    /const resolvedRollingMessageId = isControlledChat\s*\?\s*controlledRollingMessageId\s*:\s*homeRollingMessageId;/,
+  );
+  assert.match(
+    source,
+    /const resolvedRevealedLength = isControlledChat\s*\?\s*controlledRevealedLength\s*:\s*homeRevealedLength;/,
+  );
+});

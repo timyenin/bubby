@@ -82,6 +82,8 @@ export interface HomeScreenProps {
   lcdProps?: LcdPropsShape;
   children?: ReactNode;
   ariaLabel?: string;
+  rollingMessageId?: string | null;
+  revealedLength?: number;
 }
 
 function dataUrlToBase64(dataUrl: string): string {
@@ -188,6 +190,8 @@ function HomeScreen({
   lcdProps,
   children,
   ariaLabel = 'bubby home screen',
+  rollingMessageId: controlledRollingMessageId = null,
+  revealedLength: controlledRevealedLength = 0,
 }: HomeScreenProps) {
   const isControlledChat = Boolean(chatBarProps);
   const [homeMessages, setHomeMessages] = useState<DisplayMessage[]>(() =>
@@ -197,8 +201,8 @@ function HomeScreen({
   const [attachedImageFiles, setAttachedImageFiles] = useState<File[]>([]);
   const [attachmentClearSignal, setAttachmentClearSignal] = useState(0);
   const [isSending, setIsSending] = useState(false);
-  const [rollingMessageId, setRollingMessageId] = useState<string | null>(null);
-  const [revealedLength, setRevealedLength] = useState(0);
+  const [homeRollingMessageId, setHomeRollingMessageId] = useState<string | null>(null);
+  const [homeRevealedLength, setHomeRevealedLength] = useState(0);
   const [animationState, setAnimationState] = useState<AnimationState>(buildInitialAnimationState);
   const [vitalBarsRefreshKey, setVitalBarsRefreshKey] = useState(0);
   const [activeTheme, setActiveThemeState] = useState<CaseTheme>(() => getActiveTheme());
@@ -216,11 +220,11 @@ function HomeScreen({
 
   function startReplyRollout(messageId: string, reply: string): Promise<void> {
     clearRolloutInterval();
-    setRollingMessageId(messageId);
-    setRevealedLength(0);
+    setHomeRollingMessageId(messageId);
+    setHomeRevealedLength(0);
 
     if (!reply) {
-      setRollingMessageId(null);
+      setHomeRollingMessageId(null);
       return Promise.resolve();
     }
 
@@ -236,11 +240,11 @@ function HomeScreen({
         }
 
         currentLength += 1;
-        setRevealedLength(currentLength);
+        setHomeRevealedLength(currentLength);
 
         if (currentLength >= reply.length) {
           clearRolloutInterval();
-          setRollingMessageId(null);
+          setHomeRollingMessageId(null);
           resolve();
           return;
         }
@@ -430,8 +434,8 @@ function HomeScreen({
     } catch (error) {
       console.error('Home chat request failed', error);
       clearRolloutInterval();
-      setRollingMessageId(null);
-      setRevealedLength(0);
+      setHomeRollingMessageId(null);
+      setHomeRevealedLength(0);
       const errorHistory = appendMessageToHistory(
         createMessage('assistant', 'something glitched. try again?'),
       );
@@ -442,6 +446,12 @@ function HomeScreen({
   }
 
   const resolvedMessages = isControlledChat ? messages : homeMessages;
+  const resolvedRollingMessageId = isControlledChat
+    ? controlledRollingMessageId
+    : homeRollingMessageId;
+  const resolvedRevealedLength = isControlledChat
+    ? controlledRevealedLength
+    : homeRevealedLength;
   const resolvedLcdProps: LcdPropsShape = isControlledChat
     ? lcdProps ?? {}
     : {
@@ -547,8 +557,8 @@ function HomeScreen({
             <LCD {...resolvedLcdProps} />
             <ChatMessages
               messages={resolvedMessages}
-              rollingMessageId={rollingMessageId}
-              revealedLength={revealedLength}
+              rollingMessageId={resolvedRollingMessageId}
+              revealedLength={resolvedRevealedLength}
             />
             <ChatBar {...resolvedChatBarProps} />
           </div>

@@ -1,4 +1,10 @@
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 
 import HomeScreen from './HomeScreen.tsx';
 import {
@@ -10,6 +16,10 @@ import {
   type OnboardingPlan,
   type OnboardingProfileData,
 } from '../lib/onboarding.ts';
+import {
+  DIALOGUE_CHARACTER_DELAY_MS,
+  getDialogueRolloutDelay,
+} from '../lib/dialogueRollout.ts';
 import {
   setConversationHistory,
   setOnboardingComplete,
@@ -174,6 +184,61 @@ function Onboarding({ onComplete }: OnboardingProps) {
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [pendingPlan, setPendingPlan] = useState<PendingPlan | null>(null);
+  const [rollingMessageId, setRollingMessageId] = useState<string | null>(null);
+  const [revealedLength, setRevealedLength] = useState(0);
+  const rolloutIntervalRef = useRef<number | null>(null);
+
+  function clearRolloutInterval() {
+    if (rolloutIntervalRef.current !== null) {
+      window.clearInterval(rolloutIntervalRef.current);
+      rolloutIntervalRef.current = null;
+    }
+  }
+
+  function startReplyRollout(messageId: string, reply: string): Promise<void> {
+    clearRolloutInterval();
+    setRollingMessageId(messageId);
+    setRevealedLength(0);
+
+    if (!reply) {
+      setRollingMessageId(null);
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      let currentLength = 0;
+      let pauseUntil = 0;
+
+      rolloutIntervalRef.current = window.setInterval(() => {
+        const now = Date.now();
+
+        if (now < pauseUntil) {
+          return;
+        }
+
+        currentLength += 1;
+        setRevealedLength(currentLength);
+
+        if (currentLength >= reply.length) {
+          clearRolloutInterval();
+          setRollingMessageId(null);
+          resolve();
+          return;
+        }
+
+        const nextDelay = getDialogueRolloutDelay(reply, currentLength);
+        if (nextDelay > DIALOGUE_CHARACTER_DELAY_MS) {
+          pauseUntil = now + nextDelay;
+        }
+      }, DIALOGUE_CHARACTER_DELAY_MS);
+    });
+  }
+
+  useEffect(() => {
+    return () => {
+      clearRolloutInterval();
+    };
+  }, []);
 
   function beginConversation() {
     setPhase('chat');
@@ -218,6 +283,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
       const action = parseOnboardingCompleteAction(body.reply);
       const updatedMessages = [...nextMessages, assistantMessage];
       setMessages(updatedMessages);
+      await startReplyRollout(assistantMessage.id, visibleReply);
 
       if (action?.profile) {
         setPendingPlan({
@@ -227,10 +293,12 @@ function Onboarding({ onComplete }: OnboardingProps) {
         setPhase('reveal');
       }
     } catch {
+      const errorMessage = createMessage('assistant', 'something glitched. try that again?');
       setMessages((currentMessages) => [
         ...currentMessages,
-        createMessage('assistant', 'something glitched. try that again?'),
+        errorMessage,
       ]);
+      await startReplyRollout(errorMessage.id, errorMessage.content);
     } finally {
       setIsSending(false);
     }
@@ -274,6 +342,8 @@ function Onboarding({ onComplete }: OnboardingProps) {
         hint: isHatch ? 'tap bubby' : undefined,
       }}
       messages={messages}
+      rollingMessageId={rollingMessageId}
+      revealedLength={revealedLength}
       chatBarProps={{
         value: inputValue,
         onChange: setInputValue,
