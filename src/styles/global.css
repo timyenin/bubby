@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Pixelify+Sans:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@700&family=Inter:wght@400;500;700&family=Pixelify+Sans:wght@400;600&display=swap');
 
 :root {
   --case-color-1: #f69fd4;
@@ -132,7 +132,8 @@ button {
   margin: 0;
   text-align: center;
   color: #7760b5;
-  font-size: 1.7rem;
+  font-family: 'Fredoka', 'Pixelify Sans', Inter, sans-serif;
+  font-size: 1.9rem;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0;
@@ -141,20 +142,20 @@ button {
 
 .header-icon-button {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   place-items: center;
-  border: 1px solid rgba(138, 109, 190, 0.34);
+  border: 1px solid rgba(138, 109, 190, 0.48);
   border-radius: 50%;
-  background: rgba(255, 249, 255, 0.62);
+  background: rgba(255, 249, 255, 0.72);
   backdrop-filter: blur(6px);
   color: #8d72bf;
   opacity: 1;
 }
 
 .header-icon-button svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 
 .header-menu {
@@ -294,15 +295,17 @@ button {
 .vital-bars {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-  padding: 0;
+  gap: 5px;
+  border-radius: 10px;
+  background: rgba(255, 247, 255, 0.32);
+  padding: 5px 6px;
 }
 
 .vital-bar {
   min-width: 0;
   border: 1px solid rgba(151, 118, 195, 0.28);
   border-radius: 8px;
-  background: rgba(255, 247, 255, 0.38);
+  background: rgba(255, 247, 255, 0.52);
   padding: 6px 8px;
 }
 
@@ -339,29 +342,30 @@ button {
   overflow: hidden;
   border: 1px solid rgba(23, 23, 28, 0.25);
   border-radius: 3px;
-  background: rgba(255, 250, 255, 0.56);
+  background: rgba(240, 232, 245, 0.82);
 }
 
 .vital-bar-fill {
   height: 100%;
   border-radius: 1px;
-  mask-image: repeating-linear-gradient(to right, #000 0 4px, transparent 4px 6px);
+  background-position: 4px 0;
+  mask-image: repeating-linear-gradient(to right, #000 0 6px, transparent 6px 8px);
   mask-repeat: repeat-x;
-  -webkit-mask-image: repeating-linear-gradient(to right, #000 0 4px, transparent 4px 6px);
+  -webkit-mask-image: repeating-linear-gradient(to right, #000 0 6px, transparent 6px 8px);
   -webkit-mask-repeat: repeat-x;
   transition: width 260ms ease;
 }
 
 .vital-bar-fill-green {
-  background: #65bb77;
+  background: #3a3548;
 }
 
 .vital-bar-fill-yellow {
-  background: #e4c95b;
+  background: #3a3548;
 }
 
 .vital-bar-fill-red {
-  background: #d9696a;
+  background: #3a3548;
 }
 
 .messages-zone {
@@ -495,9 +499,9 @@ button {
   align-items: center;
   gap: 8px;
   min-height: 48px;
-  border: 1px solid rgba(151, 118, 195, 0.24);
+  border: 1px solid rgba(151, 118, 195, 0.18);
   border-radius: 18px 18px 0 0;
-  background: rgba(255, 250, 255, 0.44);
+  background: rgba(255, 245, 252, 0.68);
   backdrop-filter: blur(9px);
   padding: 6px 8px;
   color: #7e63bd;
@@ -612,9 +616,9 @@ button {
 .chat-input {
   width: 100%;
   height: 36px;
-  border: 1px solid rgba(164, 124, 209, 0.3);
+  border: 1px solid rgba(164, 124, 209, 0.22);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.74);
+  background: rgba(255, 248, 253, 0.82);
   backdrop-filter: blur(6px);
   font-size: 0.95rem;
   font-weight: 500;
