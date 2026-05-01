@@ -7,6 +7,7 @@ import path from 'node:path';
 const MODEL = 'claude-sonnet-4-6';
 const MAX_TOKENS = 1900;
 const MAX_BODY_BYTES = Math.floor(4.5 * 1024 * 1024);
+const MAX_IMAGE_ATTACHMENTS = 4;
 const CONTEXT_PLACEHOLDERS = [
   'user_profile',
   'macros_today',
@@ -87,6 +88,7 @@ interface ImagePayloadObject {
 }
 
 type ImagePayload = string | ImagePayloadObject | null | undefined;
+type ImagesPayload = ImagePayload[] | null | undefined;
 
 interface ParsedImage {
   mediaType: string;
@@ -108,11 +110,13 @@ type UserContent = string | Array<UserContentImageBlock | UserContentTextBlock>;
 interface BuildUserContentParams {
   message: string;
   image?: ImagePayload;
+  images?: ImagesPayload;
 }
 
 interface VercelRequestBody {
   message?: string;
   image?: ImagePayload;
+  images?: ImagesPayload;
   context?: ChatContextPayload;
   is_onboarding?: boolean;
 }
@@ -202,6 +206,17 @@ function parseImagePayload(image: ImagePayload): ParsedImage {
   throw new Error('image must include base64 data and media_type');
 }
 
+function buildImageContentBlock({ mediaType, data }: ParsedImage): UserContentImageBlock {
+  return {
+    type: 'image',
+    source: {
+      type: 'base64',
+      media_type: mediaType,
+      data,
+    },
+  };
+}
+
 function collectTextContent(content: unknown): string {
   if (typeof content === 'string') {
     return content;
@@ -279,21 +294,24 @@ export function renderSystemPrompt({
   return rendered;
 }
 
-export function buildUserContent({ message, image }: BuildUserContentParams): UserContent {
+export function buildUserContent({ message, image, images }: BuildUserContentParams): UserContent {
+  const imagePayloads = Array.isArray(images)
+    ? images.filter(Boolean).slice(0, MAX_IMAGE_ATTACHMENTS)
+    : [];
+
+  if (imagePayloads.length > 0) {
+    return [
+      ...imagePayloads.map((imagePayload) => buildImageContentBlock(parseImagePayload(imagePayload))),
+      { type: 'text', text: message || 'user sent photos with no caption.' },
+    ];
+  }
+
   if (!image) {
     return message;
   }
 
-  const { mediaType, data } = parseImagePayload(image);
   return [
-    {
-      type: 'image',
-      source: {
-        type: 'base64',
-        media_type: mediaType,
-        data,
-      },
-    },
+    buildImageContentBlock(parseImagePayload(image)),
     { type: 'text', text: message || 'user sent a photo with no caption.' },
   ];
 }
@@ -393,10 +411,11 @@ export function createVercelChatHandler({
       return;
     }
 
-    const { image = null, context = {} } = body ?? {};
+    const { image = null, images = null, context = {} } = body ?? {};
     const message = typeof body?.message === 'string' ? body.message.trim() : '';
+    const hasImages = Array.isArray(images) && images.filter(Boolean).length > 0;
 
-    if (!message && !image) {
+    if (!message && !image && !hasImages) {
       sendJson(response, 400, { error: 'message is required' });
       return;
     }
@@ -421,7 +440,7 @@ export function createVercelChatHandler({
     let userContent: UserContent;
 
     try {
-      userContent = buildUserContent({ message, image });
+      userContent = buildUserContent({ message, image, images });
     } catch {
       sendJson(response, 400, { error: 'valid image is required' });
       return;

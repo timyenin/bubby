@@ -456,6 +456,12 @@ button {
   gap: 6px;
 }
 
+.chat-attachment-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .chat-attachment-preview {
   position: relative;
   width: 48px;

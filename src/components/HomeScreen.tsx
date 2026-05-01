@@ -61,7 +61,7 @@ interface ChatBarPropsShape {
   value?: string;
   onChange?: (value: string) => void;
   onSubmit?: () => void;
-  onAttachmentChange?: (file: File | null) => void;
+  onAttachmentChange?: (files: File[]) => void;
   attachmentClearSignal?: number;
   disabled?: boolean;
   isSending?: boolean;
@@ -163,7 +163,7 @@ function HomeScreen({
     homeVisibleMessages(initialMessages),
   );
   const [inputValue, setInputValue] = useState('');
-  const [attachedImageFile, setAttachedImageFile] = useState<File | null>(null);
+  const [attachedImageFiles, setAttachedImageFiles] = useState<File[]>([]);
   const [attachmentClearSignal, setAttachmentClearSignal] = useState(0);
   const [isSending, setIsSending] = useState(false);
   const [rollingMessageId, setRollingMessageId] = useState<string | null>(null);
@@ -270,8 +270,8 @@ function HomeScreen({
 
   async function sendHomeMessage() {
     const content = inputValue.trim();
-    const imageFile = attachedImageFile;
-    if ((!content && !imageFile) || isSending) {
+    const imageFiles = attachedImageFiles.slice(0, 4);
+    if ((!content && imageFiles.length === 0) || isSending) {
       return;
     }
 
@@ -279,15 +279,15 @@ function HomeScreen({
     setIsSending(true);
 
     try {
-      const processedImage = imageFile
-        ? await processImageForUpload(imageFile)
-        : null;
+      const processedImages = await Promise.all(
+        imageFiles.map((imageFile) => processImageForUpload(imageFile)),
+      );
       const context = buildChatContextFromStorage();
       const userHistory = appendMessageToHistory(
         createMessage(
           'user',
           content,
-          processedImage ? { thumbnail: processedImage.thumbnail } : {},
+          processedImages[0] ? { thumbnail: processedImages[0].thumbnail } : {},
         ),
       );
 
@@ -298,12 +298,11 @@ function HomeScreen({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           message: content,
-          image: processedImage
-            ? {
-                data: dataUrlToBase64(processedImage.fullImage),
-                media_type: processedImage.mediaType,
-              }
-            : null,
+          image: null,
+          images: processedImages.map((processedImage) => ({
+            data: dataUrlToBase64(processedImage.fullImage),
+            media_type: processedImage.mediaType,
+          })),
           context,
           is_onboarding: false,
         }),
@@ -351,8 +350,8 @@ function HomeScreen({
         await startReplyRollout(assistantMessage.id ?? assistantMessage.timestamp, visibleReply);
       }
 
-      if (processedImage) {
-        setAttachedImageFile(null);
+      if (processedImages.length > 0) {
+        setAttachedImageFiles([]);
         setAttachmentClearSignal((currentSignal) => currentSignal + 1);
       }
     } catch (error) {
@@ -385,7 +384,7 @@ function HomeScreen({
         value: inputValue,
         onChange: setInputValue,
         onSubmit: sendHomeMessage,
-        onAttachmentChange: setAttachedImageFile,
+        onAttachmentChange: setAttachedImageFiles,
         attachmentClearSignal,
         disabled: isSending,
         isSending,

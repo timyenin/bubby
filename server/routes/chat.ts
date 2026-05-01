@@ -9,6 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const BASE_PROMPT_URL = new URL('../prompts/bubby_base.md', import.meta.url);
 const ONBOARDING_PROMPT_URL = new URL('../prompts/onboarding.md', import.meta.url);
+const MAX_IMAGE_ATTACHMENTS = 4;
 const CONTEXT_PLACEHOLDERS = [
   'user_profile',
   'macros_today',
@@ -57,6 +58,7 @@ interface ImagePayloadObject {
 }
 
 type ImagePayload = string | ImagePayloadObject | null | undefined;
+type ImagesPayload = ImagePayload[] | null | undefined;
 
 interface ParsedImage {
   mediaType: string;
@@ -78,11 +80,13 @@ type UserContent = string | Array<UserContentImageBlock | UserContentTextBlock>;
 interface BuildUserContentParams {
   message: string;
   image?: ImagePayload;
+  images?: ImagesPayload;
 }
 
 interface ChatRequestBody {
   message?: string;
   image?: ImagePayload;
+  images?: ImagesPayload;
   context?: ChatContextPayload;
   is_onboarding?: boolean;
 }
@@ -153,6 +157,17 @@ function parseImagePayload(image: ImagePayload): ParsedImage {
   throw new Error('image must include base64 data and media_type');
 }
 
+function buildImageContentBlock({ mediaType, data }: ParsedImage): UserContentImageBlock {
+  return {
+    type: 'image',
+    source: {
+      type: 'base64',
+      media_type: mediaType,
+      data,
+    },
+  };
+}
+
 export function loadPrompts(): Prompts {
   try {
     return {
@@ -188,21 +203,24 @@ export function renderSystemPrompt({
   return rendered;
 }
 
-export function buildUserContent({ message, image }: BuildUserContentParams): UserContent {
+export function buildUserContent({ message, image, images }: BuildUserContentParams): UserContent {
+  const imagePayloads = Array.isArray(images)
+    ? images.filter(Boolean).slice(0, MAX_IMAGE_ATTACHMENTS)
+    : [];
+
+  if (imagePayloads.length > 0) {
+    return [
+      ...imagePayloads.map((imagePayload) => buildImageContentBlock(parseImagePayload(imagePayload))),
+      { type: 'text', text: message || 'user sent photos with no caption.' },
+    ];
+  }
+
   if (!image) {
     return message;
   }
 
-  const { mediaType, data } = parseImagePayload(image);
   return [
-    {
-      type: 'image',
-      source: {
-        type: 'base64',
-        media_type: mediaType,
-        data,
-      },
-    },
+    buildImageContentBlock(parseImagePayload(image)),
     { type: 'text', text: message || 'user sent a photo with no caption.' },
   ];
 }
@@ -238,10 +256,11 @@ export function createChatRouter({ claudeClient, prompts }: CreateChatRouterPara
 
   router.post('/', async (request: Request, response: Response) => {
     const body = (request.body ?? {}) as ChatRequestBody;
-    const { image = null, context = {} } = body;
+    const { image = null, images = null, context = {} } = body;
     const message = typeof body.message === 'string' ? body.message.trim() : '';
+    const hasImages = Array.isArray(images) && images.filter(Boolean).length > 0;
 
-    if (!message && !image) {
+    if (!message && !image && !hasImages) {
       response.status(400).json({ error: 'message is required' });
       return;
     }
@@ -256,7 +275,7 @@ export function createChatRouter({ claudeClient, prompts }: CreateChatRouterPara
     let userContent: UserContent;
 
     try {
-      userContent = buildUserContent({ message, image });
+      userContent = buildUserContent({ message, image, images });
     } catch {
       response.status(400).json({ error: 'valid image is required' });
       return;

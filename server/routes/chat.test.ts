@@ -222,3 +222,55 @@ test('buildUserContent formats data URL images for Anthropic vision messages', (
     ],
   );
 });
+
+test('buildUserContent formats multiple images before one text block', () => {
+  assert.deepEqual(
+    buildUserContent({
+      message: 'these are lunch',
+      images: [
+        { data: 'first', media_type: 'image/jpeg' },
+        { data: 'second', media_type: 'image/png' },
+      ],
+    }),
+    [
+      {
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: 'image/jpeg',
+          data: 'first',
+        },
+      },
+      {
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: 'image/png',
+          data: 'second',
+        },
+      },
+      { type: 'text', text: 'these are lunch' },
+    ],
+  );
+});
+
+test('buildUserContent caps multiple images at four', () => {
+  const content = buildUserContent({
+    message: 'lots of angles',
+    images: [
+      { data: 'one', media_type: 'image/jpeg' },
+      { data: 'two', media_type: 'image/jpeg' },
+      { data: 'three', media_type: 'image/jpeg' },
+      { data: 'four', media_type: 'image/jpeg' },
+      { data: 'five', media_type: 'image/jpeg' },
+    ],
+  });
+
+  assert.equal(content.length, 5);
+  assert.deepEqual(
+    content
+      .filter((part) => part.type === 'image')
+      .map((part) => part.source.data),
+    ['one', 'two', 'three', 'four'],
+  );
+});

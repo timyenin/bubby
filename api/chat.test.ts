@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import defaultChatHandler, { createVercelChatHandler } from './chat.ts';
+import defaultChatHandler, { buildUserContent, createVercelChatHandler } from './chat.ts';
 
 function createMockResponse() {
   return {
@@ -164,4 +164,35 @@ test('vercel chat handler lazily loads prompts for valid POST requests', async (
   assert.equal(response.statusCode, 200);
   assert.equal(promptLoaderWasCalled, true);
   assert.match(capturedRequest.system, /lazy profile: \{"name":"Tim"\}/);
+});
+
+test('vercel buildUserContent formats multiple images before one text block', () => {
+  assert.deepEqual(
+    buildUserContent({
+      message: 'these are lunch',
+      images: [
+        { data: 'first', media_type: 'image/jpeg' },
+        { data: 'second', media_type: 'image/png' },
+      ],
+    }),
+    [
+      {
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: 'image/jpeg',
+          data: 'first',
+        },
+      },
+      {
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: 'image/png',
+          data: 'second',
+        },
+      },
+      { type: 'text', text: 'these are lunch' },
+    ],
+  );
 });

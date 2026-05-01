@@ -6,16 +6,19 @@ import {
   type FormEvent,
 } from 'react';
 
+const MAX_ATTACHMENTS = 4;
+
 interface AttachmentPreview {
   url: string;
   name: string;
+  file: File;
 }
 
 interface ChatBarProps {
   value?: string;
   onChange?: (value: string) => void;
   onSubmit?: () => void;
-  onAttachmentChange?: (file: File | null) => void;
+  onAttachmentChange?: (files: File[]) => void;
   attachmentClearSignal?: number;
   disabled?: boolean;
   isSending?: boolean;
@@ -33,21 +36,23 @@ function ChatBar({
   placeholder = 'Type a message...',
 }: ChatBarProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [attachmentPreview, setAttachmentPreview] = useState<AttachmentPreview | null>(null);
+  const [attachmentPreviews, setAttachmentPreviews] = useState<AttachmentPreview[]>([]);
   const canAttach = !disabled && !isSending && Boolean(onAttachmentChange);
-  const hasAttachment = Boolean(attachmentPreview);
+  const hasAttachment = attachmentPreviews.length > 0;
   const canSend = !disabled && !isSending && (value.trim().length > 0 || hasAttachment);
+
+  function revokePreviews(previews: AttachmentPreview[]) {
+    previews.forEach((preview) => URL.revokeObjectURL(preview.url));
+  }
 
   useEffect(() => {
     if (attachmentClearSignal === undefined) {
       return;
     }
 
-    setAttachmentPreview((currentPreview) => {
-      if (currentPreview?.url) {
-        URL.revokeObjectURL(currentPreview.url);
-      }
-      return null;
+    setAttachmentPreviews((currentPreviews) => {
+      revokePreviews(currentPreviews);
+      return [];
     });
 
     if (fileInputRef.current) {
@@ -57,11 +62,9 @@ function ChatBar({
 
   useEffect(
     () => () => {
-      if (attachmentPreview?.url) {
-        URL.revokeObjectURL(attachmentPreview.url);
-      }
+      revokePreviews(attachmentPreviews);
     },
-    [attachmentPreview],
+    [attachmentPreviews],
   );
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -72,37 +75,37 @@ function ChatBar({
     }
   }
 
-  function clearAttachment() {
-    setAttachmentPreview((currentPreview) => {
-      if (currentPreview?.url) {
-        URL.revokeObjectURL(currentPreview.url);
-      }
-      return null;
+  function updateAttachmentPreviews(files: File[]) {
+    setAttachmentPreviews((currentPreviews) => {
+      revokePreviews(currentPreviews);
+
+      return files.map((file) => ({
+        file,
+        url: URL.createObjectURL(file),
+        name: file.name || 'selected image',
+      }));
     });
-    onAttachmentChange?.(null);
+    onAttachmentChange?.(files);
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   }
 
+  function removeAttachment(indexToRemove: number) {
+    const nextFiles = attachmentPreviews
+      .filter((_, index) => index !== indexToRemove)
+      .map((preview) => preview.file);
+    updateAttachmentPreviews(nextFiles);
+  }
+
   function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) {
+    const files = Array.from(event.target.files ?? []).slice(0, MAX_ATTACHMENTS);
+    if (files.length === 0) {
       return;
     }
 
-    setAttachmentPreview((currentPreview) => {
-      if (currentPreview?.url) {
-        URL.revokeObjectURL(currentPreview.url);
-      }
-
-      return {
-        url: URL.createObjectURL(file),
-        name: file.name || 'selected image',
-      };
-    });
-    onAttachmentChange?.(file);
+    updateAttachmentPreviews(files);
   }
 
   return (
@@ -126,19 +129,24 @@ function ChatBar({
         className="chat-file-input"
         type="file"
         accept="image/*"
+        multiple
         disabled={!canAttach}
         tabIndex={-1}
         onChange={handleAttachmentChange}
       />
 
       <div className={`chat-input-shell${hasAttachment ? ' chat-input-shell-with-preview' : ''}`}>
-        {attachmentPreview ? (
-          <div className="chat-attachment-preview">
-            <img src={attachmentPreview.url} alt="" />
-            <button type="button" onClick={clearAttachment}>
-              <span aria-hidden="true">x</span>
-              <span className="sr-only">remove image</span>
-            </button>
+        {hasAttachment ? (
+          <div className="chat-attachment-preview-row">
+            {attachmentPreviews.map((preview, index) => (
+              <div className="chat-attachment-preview" key={`${preview.name}-${preview.url}`}>
+                <img src={preview.url} alt="" />
+                <button type="button" onClick={() => removeAttachment(index)}>
+                  <span aria-hidden="true">x</span>
+                  <span className="sr-only">remove image</span>
+                </button>
+              </div>
+            ))}
           </div>
         ) : null}
         <input
