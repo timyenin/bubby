@@ -286,7 +286,7 @@ button {
   margin: 0;
   transform: translateX(-50%);
   color: #17171c;
-  font-family: 'Pixelify Sans', Inter, sans-serif;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 1rem;
   text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.35);
   pointer-events: none;
@@ -315,7 +315,7 @@ button {
   justify-content: center;
   gap: 3px;
   color: #5f4a97;
-  font-family: 'Pixelify Sans', Inter, sans-serif;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 0.8rem;
   font-weight: 700;
   line-height: 1;
@@ -408,7 +408,7 @@ button {
   border-radius: 15px 15px 15px 6px;
   background: #fff3d7;
   color: #4c3f67;
-  font-family: 'Pixelify Sans', Inter, sans-serif;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 1rem;
   padding: 9px 11px;
 }
