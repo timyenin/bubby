@@ -282,7 +282,7 @@ button {
 .lcd-hint {
   position: absolute;
   left: 50%;
-  bottom: 12px;
+  bottom: 8px;
   margin: 0;
   transform: translateX(-50%);
   color: #17171c;
