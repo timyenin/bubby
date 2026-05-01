@@ -333,9 +333,10 @@ button {
   gap: 3px;
   color: #5f4a97;
   font-family: "Dogica", system-ui, sans-serif;
-  font-size: 0.54rem;
+  font-size: 0.56rem;
   font-weight: 700;
   line-height: 1;
+  letter-spacing: 0;
   margin-bottom: 5px;
   text-align: center;
 }
@@ -413,10 +414,11 @@ button {
 }
 
 .message-bubble {
-  max-width: 78%;
+  max-width: 86%;
   margin: 0;
   border: 1px solid transparent;
-  line-height: 1.7;
+  line-height: 1.72;
+  letter-spacing: 0;
   white-space: pre-wrap;
 }
 
@@ -426,8 +428,8 @@ button {
   background: #fff3d7;
   color: #4c3f67;
   font-family: "Dogica", system-ui, sans-serif;
-  font-size: 0.66rem;
-  line-height: 1.7;
+  font-size: 0.64rem;
+  line-height: 1.72;
   padding: 9px 11px;
 }
 
@@ -437,9 +439,10 @@ button {
   background: #9679d2;
   color: #fffaff;
   font-family: "Dogica", system-ui, sans-serif;
-  font-size: 0.66rem;
+  max-width: 84%;
+  font-size: 0.64rem;
   font-weight: 400;
-  line-height: 1.7;
+  line-height: 1.68;
   padding: 9px 12px;
 }
 
@@ -640,8 +643,9 @@ button {
   background: rgba(255, 248, 253, 0.82);
   backdrop-filter: blur(6px);
   font-family: "Dogica", system-ui, sans-serif;
-  font-size: 0.62rem;
+  font-size: 0.64rem;
   font-weight: 400;
+  letter-spacing: 0;
   outline: none;
   padding: 0 14px;
   text-overflow: clip;
