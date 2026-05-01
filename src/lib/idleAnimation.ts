@@ -1,6 +1,8 @@
 const LONG_HOLD_MS: [number, number] = [3000, 7000];
 const SHORT_FRAME_MS: [number, number] = [150, 300];
 const ACTION_FRAME_MS: [number, number] = [150, 200];
+const SLEEPY_Z_FRAME_INDEX = 1;
+const SLEEPY_Z_HOLD_MS: [number, number] = [2000, 4000];
 
 export function getIdleFrameDelayMs(
   frameIndex: number,
@@ -15,6 +17,28 @@ export function getActionFrameDelayMs(random: () => number = Math.random): numbe
   const [min, max] = ACTION_FRAME_MS;
 
   return Math.round(min + random() * (max - min));
+}
+
+export function getInitialAnimationFrameIndex(animationName: string, frameCount: number): number {
+  if (animationName === 'sleepy' && frameCount > SLEEPY_Z_FRAME_INDEX) {
+    return SLEEPY_Z_FRAME_INDEX;
+  }
+
+  return 0;
+}
+
+export function getLoopingAnimationFrameDelayMs(
+  animationName: string,
+  frameIndex: number,
+  random: () => number = Math.random,
+): number {
+  if (animationName === 'sleepy' && frameIndex === SLEEPY_Z_FRAME_INDEX) {
+    const [min, max] = SLEEPY_Z_HOLD_MS;
+
+    return Math.round(min + random() * (max - min));
+  }
+
+  return getIdleFrameDelayMs(frameIndex, random);
 }
 
 export function getNextIdleFrameIndex(frameIndex: number, frameCount: number): number {

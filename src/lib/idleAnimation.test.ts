@@ -5,6 +5,8 @@ import test from 'node:test';
 import {
   getActionFrameDelayMs,
   getIdleFrameDelayMs,
+  getInitialAnimationFrameIndex,
+  getLoopingAnimationFrameDelayMs,
   getNextIdleFrameIndex,
   getSpriteBackgroundPositionPercent,
 } from './idleAnimation.ts';
@@ -12,6 +14,15 @@ import {
 test('idle frame timing mixes long holds with short blink frames', () => {
   assert.equal(getIdleFrameDelayMs(0, () => 0.5), 5000);
   assert.equal(getIdleFrameDelayMs(1, () => 0.5), 225);
+});
+
+test('sleepy animation starts on the Z frame and holds it long enough to read', () => {
+  assert.equal(getInitialAnimationFrameIndex('sleepy', 2), 1);
+  assert.equal(getInitialAnimationFrameIndex('idle', 2), 0);
+  assert.equal(getLoopingAnimationFrameDelayMs('sleepy', 1, () => 0), 2000);
+  assert.equal(getLoopingAnimationFrameDelayMs('sleepy', 1, () => 1), 4000);
+  assert.equal(getLoopingAnimationFrameDelayMs('sleepy', 0, () => 0.5), 5000);
+  assert.equal(getLoopingAnimationFrameDelayMs('idle', 1, () => 0.5), 225);
 });
 
 test('action frame timing stays in the snappy one-shot range', () => {

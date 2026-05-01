@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 
 import {
   getActionFrameDelayMs,
-  getIdleFrameDelayMs,
+  getInitialAnimationFrameIndex,
+  getLoopingAnimationFrameDelayMs,
   getNextIdleFrameIndex,
   getSpriteBackgroundPositionPercent,
 } from '../lib/idleAnimation.ts';
@@ -78,6 +79,15 @@ function BubbySprite({
   }, [animationName, manifest]);
 
   useEffect(() => {
+    if (!animationSheet) {
+      setFrameIndex(0);
+      return;
+    }
+
+    setFrameIndex(getInitialAnimationFrameIndex(animationName, animationSheet.frameCount));
+  }, [animationName, animationSheet, normalizedPlaybackId]);
+
+  useEffect(() => {
     if (!animationSheet || !animated) {
       return undefined;
     }
@@ -93,7 +103,9 @@ function BubbySprite({
           getNextIdleFrameIndex(currentFrame, animationSheet.frameCount),
         );
       },
-      loop ? getIdleFrameDelayMs(frameIndex) : getActionFrameDelayMs(),
+      loop
+        ? getLoopingAnimationFrameDelayMs(animationName, frameIndex)
+        : getActionFrameDelayMs(),
     );
 
     return () => {
