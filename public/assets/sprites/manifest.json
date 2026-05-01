@@ -17,7 +17,7 @@
     0
   ],
   "pixel_grid": "1:1, no antialiasing",
-  "frame_count": 26,
+  "frame_count": 30,
   "animations": {
     "idle": [
       {
@@ -294,18 +294,63 @@
         192,
         48
       ]
+    },
+    "spin": [
+      {
+        "file": "frames/spin_01.png",
+        "index": 1,
+        "turn": "front",
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/spin_02.png",
+        "index": 2,
+        "turn": "side_left",
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/spin_03.png",
+        "index": 3,
+        "turn": "back",
+        "size": [
+          48,
+          48
+        ]
+      },
+      {
+        "file": "frames/spin_04.png",
+        "index": 4,
+        "turn": "side_right",
+        "size": [
+          48,
+          48
+        ]
+      }
+    ],
+    "spin_sheet": {
+      "file": "sheets/spin_sheet.png",
+      "size": [
+        192,
+        48
+      ]
     }
   },
   "all_sheet": {
-    "file": "bubby_all_26_frames_sheet_transparent.png",
+    "file": "bubby_all_30_frames_sheet_transparent.png",
     "size": [
-      1248,
+      1440,
       48
     ]
   },
   "preview_only": [
-    "bubby_all_26_frames_preview_8x_transparent.png",
-    "bubby_all_26_frames_checker_preview_8x.png",
+    "bubby_all_30_frames_preview_8x_transparent.png",
+    "bubby_all_30_frames_checker_preview_8x.png",
     "bubby_animation_contact_checker_preview_8x.png"
   ]
 }

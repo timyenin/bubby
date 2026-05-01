@@ -42,3 +42,11 @@ test('home screen uses the top-right header button as a bubby color cycler', () 
   assert.match(source, /bubbyFillColor/);
   assert.doesNotMatch(source, /<button className="header-icon-button" type="button" disabled>/);
 });
+
+test('home screen arms periodic spin only through the idle dwell timer', () => {
+  assert.match(source, /IDLE_SPIN_INTERVAL_MS/);
+  assert.match(source, /maybeTriggerIdleSpin/);
+  assert.match(source, /canTriggerIdleSpin\(animationState\)/);
+  assert.match(source, /window\.setTimeout/);
+  assert.match(source, /clearIdleSpinTimeout/);
+});

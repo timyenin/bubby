@@ -18,9 +18,12 @@ import {
 } from '../lib/actions.ts';
 import {
   actionsToReactiveAnimations,
+  canTriggerIdleSpin,
   createAnimationState,
   enqueueReactiveAnimations,
   finishCurrentAnimation,
+  IDLE_SPIN_INTERVAL_MS,
+  maybeTriggerIdleSpin,
   syncBaseAnimation,
   type AnimationName,
   type AnimationState,
@@ -213,6 +216,7 @@ function HomeScreen({
   );
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
   const rolloutIntervalRef = useRef<number | null>(null);
+  const idleSpinTimeoutRef = useRef<number | null>(null);
   const themeButtonRef = useRef<HTMLButtonElement | null>(null);
   const themePickerRef = useRef<HTMLDivElement | null>(null);
 
@@ -220,6 +224,13 @@ function HomeScreen({
     if (rolloutIntervalRef.current !== null) {
       window.clearInterval(rolloutIntervalRef.current);
       rolloutIntervalRef.current = null;
+    }
+  }
+
+  function clearIdleSpinTimeout() {
+    if (idleSpinTimeoutRef.current !== null) {
+      window.clearTimeout(idleSpinTimeoutRef.current);
+      idleSpinTimeoutRef.current = null;
     }
   }
 
@@ -309,8 +320,35 @@ function HomeScreen({
   useEffect(() => {
     return () => {
       clearRolloutInterval();
+      clearIdleSpinTimeout();
     };
   }, []);
+
+  useEffect(() => {
+    if (isControlledChat || !canTriggerIdleSpin(animationState)) {
+      return undefined;
+    }
+
+    idleSpinTimeoutRef.current = window.setTimeout(() => {
+      idleSpinTimeoutRef.current = null;
+      setAnimationState((currentState) =>
+        maybeTriggerIdleSpin(
+          syncBaseAnimation(currentState, readAnimationInputs()),
+          IDLE_SPIN_INTERVAL_MS,
+        ),
+      );
+    }, IDLE_SPIN_INTERVAL_MS);
+
+    return () => {
+      clearIdleSpinTimeout();
+    };
+  }, [
+    animationState.baseAnimation,
+    animationState.currentAnimation,
+    animationState.isPlayingOneShot,
+    animationState.queue.length,
+    isControlledChat,
+  ]);
 
   useEffect(() => {
     if (!isThemePickerOpen) {

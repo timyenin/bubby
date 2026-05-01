@@ -7,6 +7,7 @@ import {
   createAnimationState,
   enqueueReactiveAnimations,
   finishCurrentAnimation,
+  maybeTriggerIdleSpin,
   syncBaseAnimation,
 } from './animationState.ts';
 
@@ -115,6 +116,49 @@ test('animation queue plays reactive animations in order', () => {
   assert.deepEqual(second.queue, []);
 
   assert.equal(finishCurrentAnimation(second).currentAnimation, 'idle');
+});
+
+test('idle spin triggers only after the idle dwell interval', () => {
+  const idle = createAnimationState();
+
+  assert.equal(maybeTriggerIdleSpin(idle, 29_999).currentAnimation, 'idle');
+
+  const spinning = maybeTriggerIdleSpin(idle, 30_000);
+  assert.equal(spinning.currentAnimation, 'spin');
+  assert.equal(spinning.isPlayingOneShot, true);
+});
+
+test('sleepy and sick states never trigger idle spin', () => {
+  const sleepy = createAnimationState({
+    baseAnimation: 'sleepy',
+    currentAnimation: 'sleepy',
+  });
+  const sick = createAnimationState({
+    baseAnimation: 'sick',
+    currentAnimation: 'sick',
+  });
+
+  assert.equal(maybeTriggerIdleSpin(sleepy, 30_000).currentAnimation, 'sleepy');
+  assert.equal(maybeTriggerIdleSpin(sick, 30_000).currentAnimation, 'sick');
+});
+
+test('idle spin does not interrupt reactive or non-idle animations', () => {
+  const eating = enqueueReactiveAnimations(createAnimationState(), ['eating']);
+  const sleepy = createAnimationState({
+    baseAnimation: 'sleepy',
+    currentAnimation: 'sleepy',
+  });
+
+  assert.equal(maybeTriggerIdleSpin(eating, 30_000).currentAnimation, 'eating');
+  assert.equal(maybeTriggerIdleSpin(sleepy, 30_000).currentAnimation, 'sleepy');
+});
+
+test('idle spin returns to idle after completing', () => {
+  const spinning = maybeTriggerIdleSpin(createAnimationState(), 30_000);
+  const finished = finishCurrentAnimation(spinning);
+
+  assert.equal(finished.currentAnimation, 'idle');
+  assert.equal(finished.isPlayingOneShot, false);
 });
 
 test('duplicate queued animations advance playback ids so they can restart', () => {

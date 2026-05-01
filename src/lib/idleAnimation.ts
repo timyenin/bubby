@@ -79,6 +79,23 @@ export function getNextIdleFrameIndex(
   return Math.min(4, maxFrameIndex);
 }
 
+export function getNextAnimationFrameIndex(
+  animationName: string,
+  frameIndex: number,
+  frameCount: number,
+  random: () => number = Math.random,
+): number {
+  if (animationName === 'idle') {
+    return getNextIdleFrameIndex(frameIndex, frameCount, random);
+  }
+
+  if (!Number.isInteger(frameCount) || frameCount < 1) {
+    return 0;
+  }
+
+  return (frameIndex + 1) % frameCount;
+}
+
 export interface SpriteBackgroundPositionParams {
   frameIndex: number;
   frameWidth: number;

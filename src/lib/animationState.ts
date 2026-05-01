@@ -2,7 +2,12 @@ import type { BubbyState, DailyLog, UserProfile } from './storage.ts';
 import type { ParsedAction } from './actions.ts';
 
 export type LoopingAnimation = 'idle' | 'sleepy' | 'sick';
-export type OneShotAnimation = 'eating' | 'happy_bounce' | 'workout' | 'recovery';
+export type OneShotAnimation =
+  | 'eating'
+  | 'happy_bounce'
+  | 'workout'
+  | 'recovery'
+  | 'spin';
 export type AnimationName = LoopingAnimation | OneShotAnimation;
 
 export const LOOPING_ANIMATIONS: LoopingAnimation[] = ['idle', 'sleepy', 'sick'];
@@ -11,7 +16,9 @@ export const ONE_SHOT_ANIMATIONS: OneShotAnimation[] = [
   'happy_bounce',
   'workout',
   'recovery',
+  'spin',
 ];
+export const IDLE_SPIN_INTERVAL_MS = 30_000;
 
 const LATE_NIGHT_HOUR = 23;
 const LOW_ENERGY_SLEEPY_THRESHOLD = 25;
@@ -150,6 +157,26 @@ export function finishCurrentAnimation(state: AnimationState): AnimationState {
     queue: [],
     isPlayingOneShot: false,
   };
+}
+
+export function canTriggerIdleSpin(state: AnimationState): boolean {
+  return (
+    state.baseAnimation === 'idle' &&
+    state.currentAnimation === 'idle' &&
+    !state.isPlayingOneShot &&
+    state.queue.length === 0
+  );
+}
+
+export function maybeTriggerIdleSpin(
+  state: AnimationState,
+  idleDwellMs: number,
+): AnimationState {
+  if (idleDwellMs < IDLE_SPIN_INTERVAL_MS || !canTriggerIdleSpin(state)) {
+    return state;
+  }
+
+  return enqueueReactiveAnimations(state, ['spin']);
 }
 
 export function syncBaseAnimation(

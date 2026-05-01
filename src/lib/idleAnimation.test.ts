@@ -7,6 +7,7 @@ import {
   getIdleFrameDelayMs,
   getInitialAnimationFrameIndex,
   getLoopingAnimationFrameDelayMs,
+  getNextAnimationFrameIndex,
   getNextIdleFrameIndex,
   getSpriteBackgroundPositionPercent,
 } from './idleAnimation.ts';
@@ -46,6 +47,13 @@ test('idle returns to neutral after any glance frame', () => {
   assert.equal(getNextIdleFrameIndex(2, 5), 0);
   assert.equal(getNextIdleFrameIndex(3, 5), 0);
   assert.equal(getNextIdleFrameIndex(4, 5), 0);
+});
+
+test('non-idle animations continue advancing sequentially', () => {
+  assert.equal(getNextAnimationFrameIndex('eating', 0, 4), 1);
+  assert.equal(getNextAnimationFrameIndex('eating', 1, 4), 2);
+  assert.equal(getNextAnimationFrameIndex('sick', 2, 3), 0);
+  assert.equal(getNextAnimationFrameIndex('idle', 0, 5, () => 0.75), 3);
 });
 
 test('sprite sheet position maps frame offset onto the combined sheet', () => {

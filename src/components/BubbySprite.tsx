@@ -4,7 +4,7 @@ import {
   getActionFrameDelayMs,
   getInitialAnimationFrameIndex,
   getLoopingAnimationFrameDelayMs,
-  getNextIdleFrameIndex,
+  getNextAnimationFrameIndex,
   getSpriteBackgroundPositionPercent,
 } from '../lib/idleAnimation.ts';
 import {
@@ -163,7 +163,11 @@ function BubbySprite({
         }
 
         setFrameIndex((currentFrame) =>
-          getNextIdleFrameIndex(currentFrame, animationSheet.frameCount),
+          getNextAnimationFrameIndex(
+            animationName,
+            currentFrame,
+            animationSheet.frameCount,
+          ),
         );
       },
       loop
