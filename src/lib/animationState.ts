@@ -14,7 +14,7 @@ export const ONE_SHOT_ANIMATIONS: OneShotAnimation[] = [
 ];
 
 const LATE_NIGHT_HOUR = 23;
-const REST_EVENING_HOUR = 19;
+const LOW_ENERGY_SLEEPY_THRESHOLD = 25;
 
 export interface AnimationState {
   baseAnimation: LoopingAnimation;
@@ -38,8 +38,8 @@ function isLateNight(now: Date): boolean {
   return now.getHours() >= LATE_NIGHT_HOUR || now.getHours() < 5;
 }
 
-function isRestDayEvening(dailyLog: DailyLog | null | undefined, now: Date): boolean {
-  return dailyLog?.is_workout_day === false && now.getHours() >= REST_EVENING_HOUR;
+function isLowEnergy(bubbyState: BubbyState | null | undefined): boolean {
+  return Number(bubbyState?.energy ?? 100) < LOW_ENERGY_SLEEPY_THRESHOLD;
 }
 
 function getProteinTotal(dailyLog: DailyLog | null | undefined): number {
@@ -74,14 +74,13 @@ function didCrossProteinTarget({
 
 export function resolveBaseAnimation({
   bubbyState = null,
-  dailyLog = null,
   now = new Date(),
 }: BaseAnimationOptions = {}): LoopingAnimation {
   if (bubbyState?.is_sick === true) {
     return 'sick';
   }
 
-  if (isLateNight(now) || isRestDayEvening(dailyLog, now)) {
+  if (isLateNight(now) || isLowEnergy(bubbyState)) {
     return 'sleepy';
   }
 

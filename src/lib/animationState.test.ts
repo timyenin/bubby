@@ -50,20 +50,44 @@ test('state transitions idle to sick to recovery to idle', () => {
   assert.equal(finishCurrentAnimation(recovering).currentAnimation, 'idle');
 });
 
-test('sleepy loops for late night or rest day evening when not sick', () => {
+test('sleepy loops during late night when not sick', () => {
   const lateNight = syncBaseAnimation(createAnimationState(), {
     bubbyState: { is_sick: false },
     dailyLog: { is_workout_day: true },
     now: new Date('2026-04-27T23:30:00'),
   });
+
+  assert.equal(lateNight.currentAnimation, 'sleepy');
+});
+
+test('sleepy loops when energy is below 25 and not sick', () => {
+  const lowEnergy = syncBaseAnimation(createAnimationState(), {
+    bubbyState: { is_sick: false, energy: 24 },
+    dailyLog: { is_workout_day: true },
+    now: new Date('2026-04-27T14:30:00'),
+  });
+
+  assert.equal(lowEnergy.currentAnimation, 'sleepy');
+});
+
+test('rest day evening with normal energy stays idle', () => {
   const restEvening = syncBaseAnimation(createAnimationState(), {
-    bubbyState: { is_sick: false },
+    bubbyState: { is_sick: false, energy: 80 },
     dailyLog: { is_workout_day: false },
     now: new Date('2026-04-27T19:30:00'),
   });
 
-  assert.equal(lateNight.currentAnimation, 'sleepy');
-  assert.equal(restEvening.currentAnimation, 'sleepy');
+  assert.equal(restEvening.currentAnimation, 'idle');
+});
+
+test('sick overrides sleepy conditions', () => {
+  const sickLateNight = syncBaseAnimation(createAnimationState(), {
+    bubbyState: { is_sick: true, energy: 10 },
+    dailyLog: { is_workout_day: false },
+    now: new Date('2026-04-27T23:30:00'),
+  });
+
+  assert.equal(sickLateNight.currentAnimation, 'sick');
 });
 
 test('reactive animations briefly interrupt sick and then return to sick', () => {
