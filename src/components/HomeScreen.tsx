@@ -159,13 +159,7 @@ function persistAnimationName(animationName: AnimationName) {
   });
 }
 
-type ThemeStyle = CSSProperties & {
-  '--case-bezel': string;
-  '--case-bezel-light': string;
-  '--case-bezel-dark': string;
-  '--case-ink': string;
-  '--case-bg-image': string;
-};
+type ThemeStyle = CSSProperties & Record<`--${string}`, string>;
 
 function themeBackgroundImage(theme: CaseTheme): string {
   return theme.backgroundImage === 'none'
@@ -180,6 +174,7 @@ function themeStyle(theme: CaseTheme): ThemeStyle {
     '--case-bezel-dark': theme.bezelDark,
     '--case-ink': theme.caseInk,
     '--case-bg-image': themeBackgroundImage(theme),
+    ...theme.variables,
   };
 }
 
@@ -474,7 +469,7 @@ function HomeScreen({
       };
 
   return (
-    <main className="home-page">
+    <main className="home-page" style={themeStyle(activeTheme)}>
       <section
         className={`bubby-app theme-${activeTheme.id}`}
         aria-label={ariaLabel}

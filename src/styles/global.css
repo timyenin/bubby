@@ -28,8 +28,56 @@
   --case-bezel-light: #d7b8ee;
   --case-bezel-dark: #8f72bd;
   --case-bg-image: none;
+  --app-outside-bg: #5f4a97;
+  --case-surface: var(--case-color-1);
+  --case-cloud-strong: rgba(255, 255, 255, 0.7);
+  --case-cloud-soft: rgba(255, 255, 255, 0.48);
+  --wordmark-color: #7760b5;
+  --wordmark-shadow: 0 1px 0 rgba(255, 255, 255, 0.62);
+  --header-button-border: rgba(138, 109, 190, 0.48);
+  --header-button-bg: rgba(255, 249, 255, 0.72);
+  --header-button-color: #8d72bf;
+  --theme-picker-border: rgba(138, 109, 190, 0.24);
+  --theme-picker-bg: rgba(255, 250, 255, 0.58);
+  --theme-picker-shadow: 0 10px 24px rgba(95, 74, 151, 0.18);
+  --theme-swatch-border: rgba(255, 250, 255, 0.72);
+  --theme-swatch-glow: rgba(255, 255, 255, 0.28);
+  --vital-panel-bg: rgba(255, 247, 255, 0.32);
+  --vital-box-border: rgba(151, 118, 195, 0.28);
+  --vital-box-bg: rgba(255, 247, 255, 0.52);
+  --vital-label-color: #5f4a97;
+  --vital-value-color: #7d65ba;
+  --vital-track-border: rgba(23, 23, 28, 0.25);
+  --vital-track-bg: rgba(240, 232, 245, 0.82);
+  --vital-fill: #3a3548;
+  --messages-border: rgba(151, 118, 195, 0.18);
+  --messages-bg: rgba(255, 247, 255, 0.08);
+  --messages-scrollbar: rgba(125, 101, 186, 0.38);
+  --bubby-bubble-border: #d2bbe4;
+  --bubby-bubble-bg: #fff3d7;
+  --bubby-bubble-text: #4c3f67;
+  --user-bubble-border: rgba(125, 101, 186, 0.3);
+  --user-bubble-bg: #9679d2;
+  --user-bubble-text: #fffaff;
+  --chat-bar-border: rgba(151, 118, 195, 0.18);
+  --chat-bar-bg: rgba(255, 245, 252, 0.68);
+  --chat-bar-color: #7e63bd;
+  --chat-input-border: rgba(164, 124, 209, 0.22);
+  --chat-input-bg: rgba(255, 248, 253, 0.82);
+  --chat-input-text: #8264bf;
+  --chat-input-active-text: #5f4a97;
+  --chat-input-placeholder: #8a72bd;
+  --chat-icon-border: rgba(139, 111, 190, 0.26);
+  --chat-icon-bg: rgba(255, 255, 255, 0.46);
+  --chat-icon-color: #8264bf;
+  --send-button-muted: #b7a5d1;
+  --send-button-active: #7e63bd;
+  --attachment-border: rgba(125, 101, 186, 0.32);
+  --attachment-remove-border: rgba(125, 101, 186, 0.26);
+  --attachment-remove-bg: rgba(255, 250, 255, 0.92);
+  --attachment-remove-color: #7e63bd;
   color: #241f33;
-  background: #5f4a97;
+  background: var(--app-outside-bg);
   font-family: "Dogica", system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -73,7 +121,7 @@ button {
   min-height: 100dvh;
   place-items: center;
   overflow: hidden;
-  background: #5f4a97;
+  background: var(--app-outside-bg);
 }
 
 .bubby-app {
@@ -85,7 +133,7 @@ button {
   height: 100dvh;
   overflow: hidden;
   border-radius: 26px;
-  background: var(--case-color-1);
+  background: var(--case-surface);
   isolation: isolate;
 }
 
@@ -101,8 +149,8 @@ button {
 .bubby-app::before {
   background:
     var(--case-bg-image, none),
-    radial-gradient(circle at 78% 8%, rgba(255, 255, 255, 0.7) 0 9%, transparent 22%),
-    radial-gradient(circle at 8% 42%, rgba(255, 255, 255, 0.48) 0 9%, transparent 18%),
+    radial-gradient(circle at 78% 8%, var(--case-cloud-strong) 0 9%, transparent 22%),
+    radial-gradient(circle at 8% 42%, var(--case-cloud-soft) 0 9%, transparent 18%),
     radial-gradient(ellipse at 14% 23%, color-mix(in srgb, var(--case-color-5) 72%, transparent) 0 7%, transparent 17%),
     radial-gradient(ellipse at 80% 72%, color-mix(in srgb, var(--case-color-3) 58%, transparent) 0 8%, transparent 19%),
     radial-gradient(ellipse at 62% 84%, color-mix(in srgb, var(--case-color-5) 62%, transparent) 0 10%, transparent 21%),
@@ -152,13 +200,13 @@ button {
 .app-header h1 {
   margin: 0;
   text-align: center;
-  color: #7760b5;
+  color: var(--wordmark-color);
   font-family: 'Fredoka', system-ui, sans-serif;
   font-size: 1.9rem;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.62);
+  text-shadow: var(--wordmark-shadow);
 }
 
 .header-icon-button {
@@ -166,11 +214,11 @@ button {
   width: 40px;
   height: 40px;
   place-items: center;
-  border: 1px solid rgba(138, 109, 190, 0.48);
+  border: 1px solid var(--header-button-border);
   border-radius: 50%;
-  background: rgba(255, 249, 255, 0.72);
+  background: var(--header-button-bg);
   backdrop-filter: blur(6px);
-  color: #8d72bf;
+  color: var(--header-button-color);
   opacity: 1;
 }
 
@@ -197,22 +245,22 @@ button {
   z-index: 20;
   display: flex;
   gap: 8px;
-  border: 1px solid rgba(138, 109, 190, 0.24);
+  border: 1px solid var(--theme-picker-border);
   border-radius: 18px;
-  background: rgba(255, 250, 255, 0.58);
+  background: var(--theme-picker-bg);
   backdrop-filter: blur(10px);
-  box-shadow: 0 10px 24px rgba(95, 74, 151, 0.18);
+  box-shadow: var(--theme-picker-shadow);
   padding: 9px;
 }
 
 .theme-swatch {
   width: 48px;
   height: 48px;
-  border: 2px solid rgba(255, 250, 255, 0.72);
+  border: 2px solid var(--theme-swatch-border);
   border-radius: 50%;
   box-shadow:
-    inset 0 0 0 2px rgba(255, 255, 255, 0.28),
-    0 2px 8px rgba(95, 74, 151, 0.12);
+    inset 0 0 0 2px var(--theme-swatch-glow),
+    0 2px 8px color-mix(in srgb, var(--case-ink) 16%, transparent);
   cursor: pointer;
   padding: 0;
 }
@@ -319,15 +367,15 @@ button {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 5px;
   border-radius: 10px;
-  background: rgba(255, 247, 255, 0.32);
+  background: var(--vital-panel-bg);
   padding: 5px 6px;
 }
 
 .vital-bar {
   min-width: 0;
-  border: 1px solid rgba(151, 118, 195, 0.28);
+  border: 1px solid var(--vital-box-border);
   border-radius: 8px;
-  background: rgba(255, 247, 255, 0.52);
+  background: var(--vital-box-bg);
   padding: 6px 8px;
 }
 
@@ -336,7 +384,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  color: #5f4a97;
+  color: var(--vital-label-color);
   font-family: "Dogica", system-ui, sans-serif;
   font-size: 0.56rem;
   font-weight: 700;
@@ -354,7 +402,7 @@ button {
 
 .vital-bar-value {
   display: none;
-  color: #7d65ba;
+  color: var(--vital-value-color);
   font-size: 0.58rem;
   font-weight: 700;
 }
@@ -363,9 +411,9 @@ button {
   width: 100%;
   height: 10px;
   overflow: hidden;
-  border: 1px solid rgba(23, 23, 28, 0.25);
+  border: 1px solid var(--vital-track-border);
   border-radius: 3px;
-  background: rgba(240, 232, 245, 0.82);
+  background: var(--vital-track-bg);
 }
 
 .vital-bar-fill {
@@ -380,15 +428,15 @@ button {
 }
 
 .vital-bar-fill-green {
-  background: #3a3548;
+  background: var(--vital-fill);
 }
 
 .vital-bar-fill-yellow {
-  background: #3a3548;
+  background: var(--vital-fill);
 }
 
 .vital-bar-fill-red {
-  background: #3a3548;
+  background: var(--vital-fill);
 }
 
 .messages-zone {
@@ -397,13 +445,13 @@ button {
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
-  border: 1px solid rgba(151, 118, 195, 0.18);
+  border: 1px solid var(--messages-border);
   border-radius: 18px;
-  background: rgba(255, 247, 255, 0.08);
+  background: var(--messages-bg);
   backdrop-filter: blur(1.5px);
   padding: 12px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(125, 101, 186, 0.38) transparent;
+  scrollbar-color: var(--messages-scrollbar) transparent;
 }
 
 .message-row {
@@ -428,10 +476,10 @@ button {
 }
 
 .message-bubble-bubby {
-  border-color: #d2bbe4;
+  border-color: var(--bubby-bubble-border);
   border-radius: 15px 15px 15px 6px;
-  background: #fff3d7;
-  color: #4c3f67;
+  background: var(--bubby-bubble-bg);
+  color: var(--bubby-bubble-text);
   font-family: "Dogica", system-ui, sans-serif;
   font-size: 0.64rem;
   line-height: 1.72;
@@ -441,10 +489,10 @@ button {
 }
 
 .message-bubble-user {
-  border-color: rgba(125, 101, 186, 0.3);
+  border-color: var(--user-bubble-border);
   border-radius: 15px 15px 6px 15px;
-  background: #9679d2;
-  color: #fffaff;
+  background: var(--user-bubble-bg);
+  color: var(--user-bubble-text);
   font-family: "Dogica", system-ui, sans-serif;
   max-width: 84%;
   font-size: 0.64rem;
@@ -530,23 +578,23 @@ button {
   align-items: center;
   gap: 8px;
   min-height: 48px;
-  border: 1px solid rgba(151, 118, 195, 0.18);
+  border: 1px solid var(--chat-bar-border);
   border-radius: 18px 18px 0 0;
-  background: rgba(255, 245, 252, 0.68);
+  background: var(--chat-bar-bg);
   backdrop-filter: blur(9px);
   padding: 6px 8px;
-  color: #7e63bd;
+  color: var(--chat-bar-color);
   font-family: "Dogica", system-ui, sans-serif;
 }
 
 .chat-bar-active .chat-input {
-  color: #5f4a97;
+  color: var(--chat-input-active-text);
 }
 
 .chat-icon-button,
 .chat-input {
   min-width: 0;
-  color: #8264bf;
+  color: var(--chat-input-text);
   opacity: 1;
   -webkit-text-fill-color: currentColor;
 }
@@ -556,9 +604,10 @@ button {
   width: 30px;
   height: 30px;
   place-items: center;
-  border: 1px solid rgba(139, 111, 190, 0.26);
+  border: 1px solid var(--chat-icon-border);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.46);
+  background: var(--chat-icon-bg);
+  color: var(--chat-icon-color);
   cursor: pointer;
   line-height: 1;
   padding: 0;
@@ -591,11 +640,11 @@ button {
 .send-button {
   border-color: transparent;
   background: transparent;
-  color: #b7a5d1;
+  color: var(--send-button-muted);
 }
 
 .send-button-active {
-  color: #7e63bd;
+  color: var(--send-button-active);
 }
 
 .send-button svg {
@@ -626,7 +675,7 @@ button {
   display: block;
   width: 48px;
   height: 48px;
-  border: 1px solid rgba(125, 101, 186, 0.32);
+  border: 1px solid var(--attachment-border);
   border-radius: 11px;
   object-fit: cover;
 }
@@ -639,10 +688,10 @@ button {
   width: 19px;
   height: 19px;
   place-items: center;
-  border: 1px solid rgba(125, 101, 186, 0.26);
+  border: 1px solid var(--attachment-remove-border);
   border-radius: 50%;
-  background: rgba(255, 250, 255, 0.92);
-  color: #7e63bd;
+  background: var(--attachment-remove-bg);
+  color: var(--attachment-remove-color);
   font-size: 0.72rem;
   font-weight: 700;
   line-height: 1;
@@ -652,9 +701,9 @@ button {
 .chat-input {
   width: 100%;
   height: 36px;
-  border: 1px solid rgba(164, 124, 209, 0.22);
+  border: 1px solid var(--chat-input-border);
   border-radius: 18px;
-  background: rgba(255, 248, 253, 0.82);
+  background: var(--chat-input-bg);
   backdrop-filter: blur(6px);
   font-family: "Dogica", system-ui, sans-serif;
   font-size: 0.64rem;
@@ -667,7 +716,7 @@ button {
 }
 
 .chat-input::placeholder {
-  color: #8a72bd;
+  color: var(--chat-input-placeholder);
   opacity: 0.78;
 }
 

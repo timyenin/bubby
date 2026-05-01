@@ -51,3 +51,14 @@ test('getActiveTheme falls back to pink stars for unknown saved theme ids', () =
 test('THEMES includes rainbow as a non-default alternate theme', () => {
   assert.ok(THEMES.some((theme) => theme.id === 'rainbow'));
 });
+
+test('THEMES includes a dark mint theme with green accent variables', () => {
+  const darkTheme = THEMES.find((theme) => theme.id === 'dark_mint');
+
+  assert.ok(darkTheme);
+  assert.equal(darkTheme.name, 'dark mint');
+  assert.equal(darkTheme.backgroundImage, 'none');
+  assert.equal(darkTheme.caseInk, '#bdf5cf');
+  assert.equal(darkTheme.variables?.['--wordmark-color'], '#bdf5cf');
+  assert.equal(darkTheme.variables?.['--chat-icon-color'], '#3b5b49');
+});
