@@ -1,4 +1,5 @@
 import {
+  type CSSProperties,
   useCallback,
   useEffect,
   useRef,
@@ -42,6 +43,12 @@ import {
   type ChatMessage,
   type ConversationHistory,
 } from '../lib/storage.ts';
+import {
+  getActiveTheme,
+  setActiveTheme as saveActiveTheme,
+  THEMES,
+  type CaseTheme,
+} from '../lib/themes.ts';
 import {
   applyActionsVitalEffects,
   applyVitalDecay,
@@ -150,6 +157,30 @@ function persistAnimationName(animationName: AnimationName) {
   });
 }
 
+type ThemeStyle = CSSProperties & {
+  '--case-bezel': string;
+  '--case-bezel-light': string;
+  '--case-bezel-dark': string;
+  '--case-ink': string;
+  '--case-bg-image': string;
+};
+
+function themeBackgroundImage(theme: CaseTheme): string {
+  return theme.backgroundImage === 'none'
+    ? 'none'
+    : `url(${JSON.stringify(theme.backgroundImage)})`;
+}
+
+function themeStyle(theme: CaseTheme): ThemeStyle {
+  return {
+    '--case-bezel': theme.bezelColor,
+    '--case-bezel-light': theme.bezelLight,
+    '--case-bezel-dark': theme.bezelDark,
+    '--case-ink': theme.caseInk,
+    '--case-bg-image': themeBackgroundImage(theme),
+  };
+}
+
 function HomeScreen({
   messages,
   initialMessages,
@@ -170,7 +201,11 @@ function HomeScreen({
   const [revealedLength, setRevealedLength] = useState(0);
   const [animationState, setAnimationState] = useState<AnimationState>(buildInitialAnimationState);
   const [vitalBarsRefreshKey, setVitalBarsRefreshKey] = useState(0);
+  const [activeTheme, setActiveThemeState] = useState<CaseTheme>(() => getActiveTheme());
+  const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
   const rolloutIntervalRef = useRef<number | null>(null);
+  const themeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const themePickerRef = useRef<HTMLDivElement | null>(null);
 
   function clearRolloutInterval() {
     if (rolloutIntervalRef.current !== null) {
@@ -267,6 +302,38 @@ function HomeScreen({
       clearRolloutInterval();
     };
   }, []);
+
+  useEffect(() => {
+    if (!isThemePickerOpen) {
+      return undefined;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (
+        themeButtonRef.current?.contains(target) ||
+        themePickerRef.current?.contains(target)
+      ) {
+        return;
+      }
+
+      setIsThemePickerOpen(false);
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [isThemePickerOpen]);
+
+  function applyTheme(themeId: string) {
+    setActiveThemeState(saveActiveTheme(themeId));
+    setIsThemePickerOpen(false);
+  }
 
   async function sendHomeMessage() {
     const content = inputValue.trim();
@@ -398,23 +465,57 @@ function HomeScreen({
 
   return (
     <main className="home-page">
-      <section className="bubby-app theme-rainbow" aria-label={ariaLabel}>
+      <section
+        className={`bubby-app theme-${activeTheme.id}`}
+        aria-label={ariaLabel}
+        style={themeStyle(activeTheme)}
+      >
         <header className="app-header" aria-label="app header">
-          <button className="header-icon-button" type="button" disabled>
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeWidth="2"
+          <div className="header-menu">
+            <button
+              ref={themeButtonRef}
+              className="header-icon-button"
+              type="button"
+              aria-expanded={isThemePickerOpen}
+              aria-haspopup="menu"
+              onClick={() => setIsThemePickerOpen((isOpen) => !isOpen)}
             >
-              <path d="M4 7h16" />
-              <path d="M4 12h16" />
-              <path d="M4 17h16" />
-            </svg>
-            <span className="sr-only">menu</span>
-          </button>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeWidth="2"
+              >
+                <path d="M4 7h16" />
+                <path d="M4 12h16" />
+                <path d="M4 17h16" />
+              </svg>
+              <span className="sr-only">case theme</span>
+            </button>
+            {isThemePickerOpen ? (
+              <div
+                ref={themePickerRef}
+                className="theme-picker"
+                role="menu"
+                aria-label="case themes"
+              >
+                {THEMES.map((theme) => (
+                  <button
+                    key={theme.id}
+                    className={`theme-swatch${theme.id === activeTheme.id ? ' theme-swatch-active' : ''}`}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={theme.id === activeTheme.id}
+                    aria-label={`${theme.name} case theme`}
+                    onClick={() => applyTheme(theme.id)}
+                    style={{ backgroundColor: theme.bezelColor }}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
           <h1>bubby</h1>
           <button className="header-icon-button" type="button" disabled>
             <svg
