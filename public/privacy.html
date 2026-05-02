@@ -5,52 +5,224 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Bubby Privacy Policy</title>
     <style>
-      body {
-        max-width: 720px;
-        margin: 0 auto;
-        padding: 32px 20px;
-        background: #fff7fd;
+      :root {
         color: #3f3658;
+        background: #fff7fd;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        line-height: 1.6;
+        line-height: 1.62;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top right, rgba(150, 121, 210, 0.16), transparent 28rem),
+          #fff7fd;
+      }
+
+      main {
+        width: min(100%, 780px);
+        margin: 0 auto;
+        padding: 32px 20px 44px;
       }
 
       h1,
       h2 {
         color: #7760b5;
+        line-height: 1.2;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: clamp(2rem, 8vw, 3rem);
+      }
+
+      h2 {
+        margin: 30px 0 8px;
+        font-size: 1.18rem;
+      }
+
+      p,
+      ul {
+        margin: 0 0 12px;
+      }
+
+      ul {
+        padding-left: 1.35rem;
+      }
+
+      li + li {
+        margin-top: 6px;
       }
 
       a {
         color: #6d55aa;
       }
+
+      .policy-card {
+        border: 1px solid rgba(151, 118, 195, 0.24);
+        border-radius: 20px;
+        background: rgba(255, 250, 255, 0.82);
+        box-shadow: 0 18px 44px rgba(95, 74, 151, 0.12);
+        padding: clamp(18px, 4vw, 30px);
+      }
+
+      .meta {
+        color: #6c5b85;
+        font-size: 0.96rem;
+      }
+
+      .note {
+        border-left: 4px solid #9679d2;
+        border-radius: 10px;
+        background: #fff3d7;
+        padding: 12px 14px;
+      }
     </style>
   </head>
   <body>
-    <h1>Bubby Privacy Policy</h1>
-    <p>
-      Bubby stores your profile, pantry, messages, preferences, and pet state locally in your
-      browser using localStorage. You can clear this local data from the in-app info panel.
-    </p>
+    <main>
+      <article class="policy-card">
+        <h1>Bubby Privacy Policy</h1>
+        <p class="meta"><strong>Effective date:</strong> [DATE]</p>
+        <p class="meta"><strong>Contact:</strong> [YOUR SUPPORT EMAIL]</p>
 
-    <h2>AI Requests</h2>
-    <p>
-      When you chat with Bubby, your message and a small amount of local context are sent to the
-      Bubby API so an AI model can generate a reply. If you attach food photos, those images are
-      sent for that request only.
-    </p>
+        <h2>What Bubby Is</h2>
+        <p>
+          Bubby is an AI nutrition companion. It helps users chat about meals, nutrition targets,
+          food photos, pantry items, and a small virtual pet experience.
+        </p>
 
-    <h2>Reports</h2>
-    <p>
-      If you report an AI response, Bubby sends only your report reason, the latest visible Bubby
-      message, a timestamp, and a lightweight route label. Reports do not include your full chat
-      history, images, profile, weight, or macro history.
-    </p>
+        <h2>Information Bubby Stores Locally</h2>
+        <p>
+          Bubby primarily stores app data on your device or browser using localStorage keys that
+          start with <code>bubby:</code>. This local data may include:
+        </p>
+        <ul>
+          <li>profile and onboarding data, such as name, preferred name, age, height, weight, goals, activity level, training schedule, and rules</li>
+          <li>daily logs, meals, macro totals, weigh-ins, workout-day status, and adherence flags</li>
+          <li>pantry items and optional saved macros for pantry foods</li>
+          <li>Bubby state, such as vitals, animation state, sick/sleepy state, and last updated time</li>
+          <li>conversation history, including small stored image thumbnails or compressed local image copies attached to chat messages</li>
+          <li>long-term memory entries, such as preferences, rules, goals, schedule details, and other facts the user asks or allows Bubby to remember</li>
+          <li>local app preferences, such as onboarding completion, selected theme, selected Bubby color, and selected music option</li>
+        </ul>
+        <p>
+          Local data remains on your device or browser unless you clear it, clear browser/app data,
+          uninstall the app, or use Bubby's in-app clear local data control.
+        </p>
 
-    <h2>Nutrition And Safety</h2>
-    <p>
-      Bubby is AI-generated and can be wrong. Bubby is not medical advice and is not a doctor,
-      dietitian, therapist, or emergency service. Users with medical conditions, eating disorders,
-      pregnancy, diabetes, or clinical nutrition needs should talk to a qualified professional.
-    </p>
+        <h2>Information Sent For AI Processing</h2>
+        <p>
+          When you send a chat message, Bubby sends your message and relevant app context to
+          <code>/api/chat</code> so an AI response can be generated. This context may include recent
+          conversation history, profile details, macro targets, daily nutrition totals, pantry
+          information, Bubby state, long-term memory entries, current local time context, and safety
+          signals such as calorie-floor or weight-loss-rate context.
+        </p>
+
+        <h2>Food Photo And Image Uploads</h2>
+        <p>
+          If you attach a food photo or other image, Bubby compresses and resizes the image in your
+          browser before sending it for AI processing. Full-size upload images are used for that AI
+          request. Bubby may keep smaller local thumbnails or compressed local image copies in chat
+          history so the conversation can display the images later.
+        </p>
+
+        <h2>AI Response Reports</h2>
+        <p>
+          If you report an AI response inside the app, Bubby sends a minimal report to
+          <code>/api/report</code>. The report includes only:
+        </p>
+        <ul>
+          <li>the reason you typed</li>
+          <li>the latest visible Bubby message, with hidden action envelopes removed</li>
+          <li>a timestamp</li>
+          <li>a lightweight route label</li>
+        </ul>
+        <p>
+          Reports do not send your full chat history, images, profile, weight, macro history, pantry,
+          or memory list.
+        </p>
+
+        <h2>How Information Is Used</h2>
+        <p>Bubby uses information to:</p>
+        <ul>
+          <li>generate AI chat responses</li>
+          <li>estimate and log meals, macros, weight updates, workouts, and related nutrition context</li>
+          <li>maintain local conversation history, Bubby state, preferences, and memory</li>
+          <li>process optional food images when you choose to attach them</li>
+          <li>receive and review user reports about AI-generated responses during testing</li>
+          <li>operate, debug, secure, and improve app functionality</li>
+        </ul>
+
+        <h2>Third-Party Processors</h2>
+        <p>
+          Bubby uses server-side API endpoints to process AI requests. AI chat content and optional
+          uploaded images may be sent to Anthropic/Claude for AI processing. Bubby may also rely on
+          hosting and infrastructure providers to operate the app and API endpoints.
+        </p>
+        <p>
+          Data handled by service providers may be processed according to their systems, policies,
+          and retention practices. This policy describes what Bubby's app currently sends and stores;
+          it does not make guarantees beyond what the app controls.
+        </p>
+
+        <h2>Data Sharing</h2>
+        <p>
+          Bubby does not sell user data. Bubby does not currently use ads, billing, account sync, or
+          an analytics SDK. Data may be shared with service providers only as needed to operate app
+          functionality, such as AI processing, report handling, hosting, and server logs.
+        </p>
+
+        <h2>Data Retention And Deletion</h2>
+        <p>
+          Local Bubby data stays on your device or browser until you remove it. You can clear local
+          Bubby data from the in-app info panel by selecting <strong>clear local data</strong> and
+          confirming the prompt. This removes local <code>bubby:</code> storage keys and returns the
+          app to onboarding.
+        </p>
+        <p>
+          Data sent to AI and report endpoints may be processed by service providers and may appear in
+          server-side systems or logs according to those systems and policies. Bubby does not claim
+          permanent deletion from third-party systems unless that deletion is separately supported and
+          confirmed.
+        </p>
+
+        <h2>Security</h2>
+        <p>
+          Bubby uses HTTPS when served from production. No app can guarantee perfect security. Bubby
+          does not claim end-to-end encryption, HIPAA compliance, or medical/clinical system status.
+        </p>
+
+        <h2>Children's Privacy</h2>
+        <p>
+          Bubby is not intended for children under 13. If you believe a child under 13 has provided
+          information through Bubby, contact us using the contact email above.
+        </p>
+
+        <h2>AI Disclaimer</h2>
+        <p class="note">
+          Bubby's responses are AI-generated and may be wrong, incomplete, or inappropriate for your
+          situation. Verify important information before relying on it.
+        </p>
+
+        <h2>Health And Nutrition Disclaimer</h2>
+        <p class="note">
+          Bubby is not medical advice. Bubby is not a doctor, dietitian, therapist, or emergency
+          service. Users with medical conditions, eating disorders, pregnancy, diabetes, or clinical
+          nutrition needs should talk to a qualified professional.
+        </p>
+
+        <h2>Changes To This Policy</h2>
+        <p>
+          This policy may be updated as Bubby changes. When the policy changes, the effective date
+          should be updated and the new version should be made available from the app.
+        </p>
+      </article>
+    </main>
   </body>
 </html>
