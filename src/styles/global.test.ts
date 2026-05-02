@@ -84,3 +84,15 @@ test('primary macro input row reserves room for the calorie label', () => {
     mobileBlock.indexOf('.macro-input-row-primary') > mobileBlock.indexOf('.macro-input-row'),
   );
 });
+
+test('lcd music notes are clipped inside the lcd window and ignore pointer events', () => {
+  const notesRule = ruleFor('.lcd-music-notes');
+  const noteRule = ruleFor('.lcd-music-note');
+
+  assert.match(notesRule, /position:\s*absolute/);
+  assert.match(notesRule, /inset:\s*0/);
+  assert.match(notesRule, /overflow:\s*hidden/);
+  assert.match(notesRule, /pointer-events:\s*none/);
+  assert.match(noteRule, /position:\s*absolute/);
+  assert.match(noteRule, /animation:/);
+});

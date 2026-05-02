@@ -261,13 +261,33 @@ button {
   left: 0;
   z-index: 20;
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 10px;
   border: 1px solid var(--theme-picker-border);
   border-radius: 18px;
   background: var(--theme-picker-bg);
   backdrop-filter: blur(10px);
   box-shadow: var(--theme-picker-shadow);
   padding: 9px;
+}
+
+.theme-picker-section {
+  display: grid;
+  gap: 6px;
+}
+
+.theme-picker-label {
+  margin: 0;
+  color: var(--case-ink);
+  font-family: "Dogica", system-ui, sans-serif;
+  font-size: 0.52rem;
+  line-height: 1.2;
+}
+
+.theme-swatch-row,
+.music-option-row {
+  display: flex;
+  gap: 8px;
 }
 
 .theme-swatch {
@@ -285,6 +305,26 @@ button {
 .theme-swatch-active {
   outline: 2px solid var(--case-ink);
   outline-offset: 2px;
+}
+
+.music-option-button {
+  min-width: 48px;
+  min-height: 36px;
+  border: 1px solid var(--theme-picker-border);
+  border-radius: 12px;
+  background: rgba(255, 250, 255, 0.64);
+  color: var(--case-ink);
+  font-family: "Dogica", system-ui, sans-serif;
+  font-size: 0.56rem;
+  line-height: 1.2;
+  cursor: pointer;
+  padding: 8px 10px;
+}
+
+.music-option-button-active {
+  outline: 2px solid var(--case-ink);
+  outline-offset: 2px;
+  background: rgba(255, 250, 255, 0.86);
 }
 
 .bubby-case {
@@ -351,10 +391,107 @@ button {
   user-select: none;
 }
 
+.lcd-music-notes {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.lcd-music-note {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #17171c;
+  image-rendering: pixelated;
+  opacity: 0;
+  animation: lcd-music-note-drift 5.4s linear infinite;
+}
+
+.lcd-music-note::before,
+.lcd-music-note::after {
+  position: absolute;
+  display: block;
+  background: #17171c;
+  content: "";
+}
+
+.lcd-music-note::before {
+  left: 5px;
+  top: -9px;
+  width: 3px;
+  height: 12px;
+}
+
+.lcd-music-note::after {
+  left: 5px;
+  top: -9px;
+  width: 8px;
+  height: 3px;
+}
+
+.lcd-music-note-1 {
+  top: -8px;
+  left: 13%;
+  animation-delay: 0s;
+}
+
+.lcd-music-note-2 {
+  top: 4%;
+  left: 80%;
+  animation-delay: -1.1s;
+}
+
+.lcd-music-note-3 {
+  top: 16%;
+  left: 21%;
+  animation-delay: -2.2s;
+}
+
+.lcd-music-note-4 {
+  top: -14px;
+  left: 68%;
+  animation-delay: -3.3s;
+}
+
+.lcd-music-note-5 {
+  top: 28%;
+  left: 88%;
+  animation-delay: -4.4s;
+}
+
+.lcd-music-note-6 {
+  top: 36%;
+  left: 8%;
+  animation-delay: -5s;
+}
+
+@keyframes lcd-music-note-drift {
+  0% {
+    transform: translateY(-18px);
+    opacity: 0;
+  }
+
+  18% {
+    opacity: 0.42;
+  }
+
+  82% {
+    opacity: 0.42;
+  }
+
+  100% {
+    transform: translateY(128px);
+    opacity: 0;
+  }
+}
+
 .bubby-sprite {
   position: absolute;
   left: 50%;
   bottom: 6px;
+  z-index: 2;
   width: var(--sprite-width);
   height: var(--sprite-height);
   transform: translateX(-50%);
@@ -369,6 +506,7 @@ button {
   position: absolute;
   left: 50%;
   bottom: 8px;
+  z-index: 3;
   margin: 0;
   transform: translateX(-50%);
   color: #17171c;

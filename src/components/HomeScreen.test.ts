@@ -50,3 +50,13 @@ test('home screen arms periodic spin only through the idle dwell timer', () => {
   assert.match(source, /window\.setTimeout/);
   assert.match(source, /clearIdleSpinTimeout/);
 });
+
+test('home screen extends the hamburger menu with music controls', () => {
+  assert.match(source, /MUSIC_OPTIONS\.map/);
+  assert.match(source, /mute music/);
+  assert.match(source, /play classic bubby 8-bit music/);
+  assert.match(source, /setActiveMusicOption/);
+  assert.match(source, /audioRef/);
+  assert.match(source, /play\(\)\.catch|await audio\.play/);
+  assert.match(source, /musicNotesActive/);
+});

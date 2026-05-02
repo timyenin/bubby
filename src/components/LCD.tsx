@@ -12,7 +12,10 @@ interface LCDProps {
   animationLoop?: boolean;
   onAnimationComplete?: () => void;
   bubbyFillColor?: string | null;
+  musicNotesActive?: boolean;
 }
+
+const MUSIC_NOTE_COUNT = 6;
 
 function LCD({
   onActivate,
@@ -23,6 +26,7 @@ function LCD({
   animationLoop = true,
   onAnimationComplete,
   bubbyFillColor = null,
+  musicNotesActive = false,
 }: LCDProps) {
   const isInteractive = typeof onActivate === 'function';
 
@@ -53,6 +57,16 @@ function LCD({
           alt=""
           draggable="false"
         />
+        {musicNotesActive ? (
+          <div className="lcd-music-notes" aria-hidden="true">
+            {Array.from({ length: MUSIC_NOTE_COUNT }, (_, index) => (
+              <span
+                className={`lcd-music-note lcd-music-note-${index + 1}`}
+                key={`music-note-${index + 1}`}
+              />
+            ))}
+          </div>
+        ) : null}
         <BubbySprite
           key={`${animationName}:${animationPlaybackId ?? 0}`}
           animated={spriteAnimated}

@@ -39,6 +39,13 @@ import {
   getDialogueRolloutDelay,
 } from '../lib/dialogueRollout.ts';
 import { processImageForUpload } from '../lib/imageProcessing.ts';
+import {
+  getActiveMusicOption,
+  MUSIC_OPTIONS,
+  setActiveMusicOption,
+  type MusicOption,
+  volumeForMusicOption,
+} from '../lib/music.ts';
 import { ONBOARDING_HOME_CLOSING_LINE } from '../lib/onboarding.ts';
 import {
   appendMessageToHistory,
@@ -72,6 +79,7 @@ interface LcdPropsShape {
   animationLoop?: boolean;
   onAnimationComplete?: () => void;
   bubbyFillColor?: string | null;
+  musicNotesActive?: boolean;
 }
 
 interface ChatBarPropsShape {
@@ -214,9 +222,15 @@ function HomeScreen({
   const [activeBubbyColorId, setActiveBubbyColorId] = useState(() =>
     getBubbyColorOption(getBubbyColorId()).id,
   );
+  const [activeMusicOption, setActiveMusicOptionState] = useState<MusicOption>(() =>
+    getActiveMusicOption(),
+  );
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
   const rolloutIntervalRef = useRef<number | null>(null);
   const idleSpinTimeoutRef = useRef<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const musicRequestIdRef = useRef(0);
   const themeButtonRef = useRef<HTMLButtonElement | null>(null);
   const themePickerRef = useRef<HTMLDivElement | null>(null);
 
@@ -232,6 +246,51 @@ function HomeScreen({
       window.clearTimeout(idleSpinTimeoutRef.current);
       idleSpinTimeoutRef.current = null;
     }
+  }
+
+  function stopMusicPlayback() {
+    musicRequestIdRef.current += 1;
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+    setIsMusicPlaying(false);
+  }
+
+  async function startMusicPlayback(option: MusicOption) {
+    if (!option.src) {
+      stopMusicPlayback();
+      return;
+    }
+
+    const requestId = musicRequestIdRef.current + 1;
+    musicRequestIdRef.current = requestId;
+    const audio = audioRef.current ?? new Audio();
+    audioRef.current = audio;
+    audio.pause();
+    audio.src = option.src;
+    audio.loop = true;
+    audio.volume = volumeForMusicOption(option);
+    audio.currentTime = 0;
+
+    try {
+      await audio.play();
+      if (musicRequestIdRef.current === requestId) {
+        setIsMusicPlaying(true);
+      }
+    } catch (error) {
+      if (musicRequestIdRef.current === requestId) {
+        setIsMusicPlaying(false);
+      }
+      console.warn('Bubby music playback was blocked', error);
+    }
+  }
+
+  function musicOptionAriaLabel(option: MusicOption): string {
+    return option.id === 'mute'
+      ? 'mute music'
+      : 'play classic bubby 8-bit music';
   }
 
   function startReplyRollout(messageId: string, reply: string): Promise<void> {
@@ -321,6 +380,8 @@ function HomeScreen({
     return () => {
       clearRolloutInterval();
       clearIdleSpinTimeout();
+      audioRef.current?.pause();
+      audioRef.current = null;
     };
   }, []);
 
@@ -380,6 +441,18 @@ function HomeScreen({
   function applyTheme(themeId: string) {
     setActiveThemeState(saveActiveTheme(themeId));
     setIsThemePickerOpen(false);
+  }
+
+  function applyMusicOption(musicId: string) {
+    const nextMusicOption = setActiveMusicOption(musicId);
+    setActiveMusicOptionState(nextMusicOption);
+
+    if (!nextMusicOption.src) {
+      stopMusicPlayback();
+      return;
+    }
+
+    void startMusicPlayback(nextMusicOption);
   }
 
   function cycleBubbyColor() {
@@ -502,6 +575,7 @@ function HomeScreen({
     ? controlledRevealedLength
     : homeRevealedLength;
   const activeBubbyColor = getBubbyColorOption(activeBubbyColorId);
+  const areMusicNotesActive = activeMusicOption.src !== null && isMusicPlaying;
   const bubbyColorButtonStyle = {
     '--bubby-color-swatch': activeBubbyColor.fillColor ?? 'transparent',
   } as CSSProperties & Record<'--bubby-color-swatch', string>;
@@ -509,10 +583,12 @@ function HomeScreen({
     ? {
         ...lcdProps,
         bubbyFillColor: lcdProps?.bubbyFillColor ?? activeBubbyColor.fillColor,
+        musicNotesActive: lcdProps?.musicNotesActive ?? areMusicNotesActive,
       }
     : {
         ...lcdProps,
         bubbyFillColor: lcdProps?.bubbyFillColor ?? activeBubbyColor.fillColor,
+        musicNotesActive: lcdProps?.musicNotesActive ?? areMusicNotesActive,
         animationName: animationState.currentAnimation,
         animationPlaybackId: animationState.playbackId,
         animationLoop: !animationState.isPlayingOneShot,
@@ -566,20 +642,42 @@ function HomeScreen({
                 ref={themePickerRef}
                 className="theme-picker"
                 role="menu"
-                aria-label="case themes"
+                aria-label="case themes and music"
               >
-                {THEMES.map((theme) => (
-                  <button
-                    key={theme.id}
-                    className={`theme-swatch${theme.id === activeTheme.id ? ' theme-swatch-active' : ''}`}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={theme.id === activeTheme.id}
-                    aria-label={`${theme.name} case theme`}
-                    onClick={() => applyTheme(theme.id)}
-                    style={{ backgroundColor: theme.bezelColor }}
-                  />
-                ))}
+                <div className="theme-picker-section">
+                  <p className="theme-picker-label">theme</p>
+                  <div className="theme-swatch-row">
+                    {THEMES.map((theme) => (
+                      <button
+                        key={theme.id}
+                        className={`theme-swatch${theme.id === activeTheme.id ? ' theme-swatch-active' : ''}`}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={theme.id === activeTheme.id}
+                        aria-label={`${theme.name} case theme`}
+                        onClick={() => applyTheme(theme.id)}
+                        style={{ backgroundColor: theme.bezelColor }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="theme-picker-section">
+                  <p className="theme-picker-label">music</p>
+                  <div className="music-option-row">
+                    {MUSIC_OPTIONS.map((musicOption) => (
+                      <button
+                        key={musicOption.id}
+                        className={`music-option-button${musicOption.id === activeMusicOption.id ? ' music-option-button-active' : ''}`}
+                        type="button"
+                        aria-pressed={musicOption.id === activeMusicOption.id}
+                        aria-label={musicOptionAriaLabel(musicOption)}
+                        onClick={() => applyMusicOption(musicOption.id)}
+                      >
+                        {musicOption.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : null}
           </div>
