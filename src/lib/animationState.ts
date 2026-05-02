@@ -25,6 +25,9 @@ export const TAP_REACTION_HAPPY_ROLL = 0.7;
 
 const LATE_NIGHT_HOUR = 23;
 const LOW_ENERGY_SLEEPY_THRESHOLD = 25;
+const MIN_DIRECT_ANIMATION_COUNT = 1;
+const MAX_DIRECT_ANIMATION_COUNT = 3;
+const SAFE_DIRECT_ANIMATIONS: OneShotAnimation[] = ['happy_bounce', 'tap_x_eyes'];
 
 export interface AnimationState {
   baseAnimation: LoopingAnimation;
@@ -80,6 +83,34 @@ function didCrossProteinTarget({
   }
 
   return getProteinTotal(beforeDailyLog) < target && getProteinTotal(afterDailyLog) >= target;
+}
+
+function clampDirectAnimationCount(count: unknown): number {
+  const numericCount = Math.floor(Number(count ?? MIN_DIRECT_ANIMATION_COUNT));
+  if (!Number.isFinite(numericCount)) {
+    return MIN_DIRECT_ANIMATION_COUNT;
+  }
+
+  return Math.min(
+    MAX_DIRECT_ANIMATION_COUNT,
+    Math.max(MIN_DIRECT_ANIMATION_COUNT, numericCount),
+  );
+}
+
+function isSafeDirectAnimation(animationName: unknown): animationName is OneShotAnimation {
+  return SAFE_DIRECT_ANIMATIONS.includes(animationName as OneShotAnimation);
+}
+
+function directAnimationActionToReactiveAnimations(action: ParsedAction): OneShotAnimation[] {
+  const animationName = action.data?.animation;
+  if (!isSafeDirectAnimation(animationName)) {
+    return [];
+  }
+
+  return Array.from(
+    { length: clampDirectAnimationCount(action.data?.count) },
+    () => animationName,
+  );
 }
 
 export function resolveBaseAnimation({
@@ -244,6 +275,10 @@ export function actionsToReactiveAnimations({
 
     if (action.type === 'set_workout_day' && action.data?.is_workout_day === true) {
       animations.push('workout');
+    }
+
+    if (action.type === 'play_animation') {
+      animations.push(...directAnimationActionToReactiveAnimations(action));
     }
   }
 

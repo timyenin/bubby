@@ -31,6 +31,7 @@ export type ActionType =
   | 'update_macros'
   | 'save_memory'
   | 'forget_memory'
+  | 'play_animation'
   | 'onboarding_complete';
 
 export interface ActionData {
@@ -52,6 +53,8 @@ export interface ActionData {
   workout_day?: Partial<Record<keyof MacroTotals, number | string>>;
   calorie_floor?: number | string;
   profile?: unknown;
+  animation?: string;
+  count?: number | string;
 }
 
 export interface ParsedAction {
@@ -429,6 +432,8 @@ export function applyAction(
       return applySaveMemory(action);
     case 'forget_memory':
       return applyForgetMemory(action);
+    case 'play_animation':
+      return null;
     case 'onboarding_complete':
       return null;
     default:

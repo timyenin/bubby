@@ -78,6 +78,22 @@ test('parseActions returns multiple action envelopes from one reply', () => {
   ]);
 });
 
+test('parseActions handles play_animation envelopes without touching storage', () => {
+  const reply = 'ok watch this\n[ACTION]{"type":"play_animation","data":{"animation":"happy_bounce","count":2}}[/ACTION]';
+
+  assert.deepEqual(parseActions(reply), [
+    {
+      type: 'play_animation',
+      data: { animation: 'happy_bounce', count: 2 },
+    },
+  ]);
+
+  assert.equal(applyAction(parseActions(reply)[0]), null);
+  assert.equal(getUserProfile(), null);
+  assert.equal(getPantry(), null);
+  assert.equal(getDailyLog('2026-04-27'), null);
+});
+
 test('log_meal appends a meal and recalculates daily totals', () => {
   setDailyLog('2026-04-27', {
     date: '2026-04-27',
