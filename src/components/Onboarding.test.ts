@@ -27,3 +27,8 @@ test('onboarding rolls out assistant replies before showing the reveal', () => {
   assert.ok(rolloutIndex > assistantMessageIndex);
   assert.ok(revealIndex > rolloutIndex);
 });
+
+test('onboarding sends readable local current time context', () => {
+  assert.match(source, /buildCurrentTimeContext/);
+  assert.doesNotMatch(source, /current_time:\s*new Date\(\)\.toISOString\(\)/);
+});

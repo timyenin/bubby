@@ -4,6 +4,7 @@ import {
   isUnderCalorieFloor,
   type MacroTargets,
 } from './macros.ts';
+import { buildCurrentTimeContext } from './timeContext.ts';
 import {
   getBubbyState,
   getConversationHistory,
@@ -213,7 +214,7 @@ export function buildChatContext({
   conversationHistory = null,
   bubbyState = null,
   now = new Date(),
-  currentTime = now.toISOString(),
+  currentTime = buildCurrentTimeContext(now),
 }: BuildChatContextOptions = {}): ChatContext {
   const macrosToday = dailyLog?.totals ?? {};
   const target = getTargetForDay(userProfile, dailyLog);
@@ -237,7 +238,7 @@ export function buildChatContext({
 export function buildChatContextFromStorage({
   now = new Date(),
   dateString = todayString(),
-  currentTime = now.toISOString(),
+  currentTime = buildCurrentTimeContext(now),
 }: { now?: Date; dateString?: string; currentTime?: string } = {}): ChatContext {
   const recentDailyLogs = collectRecentDailyLogs(dateString, 14);
 

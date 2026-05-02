@@ -27,6 +27,7 @@ import {
   setUserProfile,
   type ChatMessage,
 } from '../lib/storage.ts';
+import { buildCurrentTimeContext } from '../lib/timeContext.ts';
 
 interface OnboardingMessage extends ChatMessage {
   id: string;
@@ -266,7 +267,7 @@ function Onboarding({ onComplete }: OnboardingProps) {
           image: null,
           context: {
             recent_history: historyForApi(messages),
-            current_time: new Date().toISOString(),
+            current_time: buildCurrentTimeContext(),
             is_onboarding: true,
           },
           is_onboarding: true,

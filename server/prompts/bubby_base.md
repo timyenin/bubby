@@ -204,4 +204,4 @@ your current vital state: {{bubby_state}}
 concern level: {{concern_level}}
 weight loss rate: {{weight_loss_rate}}
 your long-term memory: {{memory}}
-current time: {{current_time}}
+current time (includes local browser timezone when available): {{current_time}}

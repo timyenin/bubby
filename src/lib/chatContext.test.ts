@@ -164,6 +164,21 @@ test('buildChatContextFromStorage reads localStorage and caps recent history at 
   });
 });
 
+test('buildChatContextFromStorage defaults current_time to readable local time context', () => {
+  const now = new Date(2026, 4, 2, 22, 44, 0);
+  const context = buildChatContextFromStorage({
+    dateString: '2026-05-02',
+    now,
+  });
+
+  assert.match(context.current_time, /local date: 2026-05-02/);
+  assert.match(context.current_time, /local time:/);
+  assert.match(context.current_time, /time zone:/);
+  assert.match(context.current_time, /utc offset: [+-]\d{2}:\d{2}/);
+  assert.match(context.current_time, new RegExp(`utc: ${now.toISOString().replaceAll('.', '\\.')}`));
+  assert.notEqual(context.current_time, now.toISOString());
+});
+
 test('buildChatContextFromStorage includes memory entries when memory exists in storage', () => {
   setMemory({
     entries: [
