@@ -25,6 +25,7 @@ import {
   IDLE_SPIN_INTERVAL_MS,
   maybeTriggerIdleSpin,
   syncBaseAnimation,
+  triggerTapReaction,
   type AnimationName,
   type AnimationState,
 } from '../lib/animationState.ts';
@@ -342,6 +343,12 @@ function HomeScreen({
     setAnimationState((currentState) => finishCurrentAnimation(currentState));
   }, []);
 
+  const handleLcdTapReaction = useCallback(() => {
+    setAnimationState((currentState) =>
+      triggerTapReaction(syncBaseAnimation(currentState, readAnimationInputs())),
+    );
+  }, []);
+
   useEffect(() => {
     if (isControlledChat) {
       return;
@@ -593,6 +600,7 @@ function HomeScreen({
         animationPlaybackId: animationState.playbackId,
         animationLoop: !animationState.isPlayingOneShot,
         onAnimationComplete: handleAnimationComplete,
+        onActivate: lcdProps?.onActivate ?? handleLcdTapReaction,
       };
   const resolvedChatBarProps: ChatBarPropsShape = isControlledChat
     ? chatBarProps ?? {}

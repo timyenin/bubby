@@ -17,7 +17,7 @@
     0
   ],
   "pixel_grid": "1:1, no antialiasing",
-  "frame_count": 30,
+  "frame_count": 31,
   "animations": {
     "idle": [
       {
@@ -339,12 +339,30 @@
         192,
         48
       ]
+    },
+    "tap_x_eyes": [
+      {
+        "file": "frames/tap_x_eyes_01.png",
+        "index": 1,
+        "expression": "x_eyes",
+        "size": [
+          48,
+          48
+        ]
+      }
+    ],
+    "tap_x_eyes_sheet": {
+      "file": "sheets/tap_x_eyes_sheet.png",
+      "size": [
+        48,
+        48
+      ]
     }
   },
   "all_sheet": {
-    "file": "bubby_all_30_frames_sheet_transparent.png",
+    "file": "bubby_all_31_frames_sheet_transparent.png",
     "size": [
-      1440,
+      1488,
       48
     ]
   },

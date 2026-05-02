@@ -51,6 +51,14 @@ test('home screen arms periodic spin only through the idle dwell timer', () => {
   assert.match(source, /clearIdleSpinTimeout/);
 });
 
+test('home screen wires post-onboarding LCD taps to tap reactions only in home mode', () => {
+  assert.match(source, /triggerTapReaction/);
+  assert.match(source, /handleLcdTapReaction/);
+  assert.match(source, /onActivate:\s*lcdProps\?\.onActivate\s*\?\?\s*handleLcdTapReaction/);
+  assert.match(source, /isControlledChat\s*\?\s*\{/);
+  assert.match(source, /isControlledChat[\s\S]*\.\.\.lcdProps[\s\S]*:/);
+});
+
 test('home screen extends the hamburger menu with music controls', () => {
   assert.match(source, /MUSIC_OPTIONS\.map/);
   assert.match(source, /mute music/);

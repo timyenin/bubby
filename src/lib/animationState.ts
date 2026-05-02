@@ -7,7 +7,8 @@ export type OneShotAnimation =
   | 'happy_bounce'
   | 'workout'
   | 'recovery'
-  | 'spin';
+  | 'spin'
+  | 'tap_x_eyes';
 export type AnimationName = LoopingAnimation | OneShotAnimation;
 
 export const LOOPING_ANIMATIONS: LoopingAnimation[] = ['idle', 'sleepy', 'sick'];
@@ -17,8 +18,10 @@ export const ONE_SHOT_ANIMATIONS: OneShotAnimation[] = [
   'workout',
   'recovery',
   'spin',
+  'tap_x_eyes',
 ];
 export const IDLE_SPIN_INTERVAL_MS = 30_000;
+export const TAP_REACTION_HAPPY_ROLL = 0.7;
 
 const LATE_NIGHT_HOUR = 23;
 const LOW_ENERGY_SLEEPY_THRESHOLD = 25;
@@ -166,6 +169,29 @@ export function canTriggerIdleSpin(state: AnimationState): boolean {
     !state.isPlayingOneShot &&
     state.queue.length === 0
   );
+}
+
+export function chooseTapReactionAnimations(
+  random: () => number = Math.random,
+): OneShotAnimation[] {
+  return random() < TAP_REACTION_HAPPY_ROLL
+    ? ['happy_bounce', 'happy_bounce']
+    : ['tap_x_eyes'];
+}
+
+export function canTriggerTapReaction(state: AnimationState): boolean {
+  return canTriggerIdleSpin(state);
+}
+
+export function triggerTapReaction(
+  state: AnimationState,
+  random: () => number = Math.random,
+): AnimationState {
+  if (!canTriggerTapReaction(state)) {
+    return state;
+  }
+
+  return enqueueReactiveAnimations(state, chooseTapReactionAnimations(random));
 }
 
 export function maybeTriggerIdleSpin(

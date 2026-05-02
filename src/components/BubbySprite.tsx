@@ -172,7 +172,7 @@ function BubbySprite({
       },
       loop
         ? getLoopingAnimationFrameDelayMs(animationName, frameIndex)
-        : getActionFrameDelayMs(),
+        : getActionFrameDelayMs(animationName),
     );
 
     return () => {

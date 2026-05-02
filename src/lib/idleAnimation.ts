@@ -1,6 +1,7 @@
 const LONG_HOLD_MS: [number, number] = [3000, 7000];
 const SHORT_FRAME_MS: [number, number] = [150, 300];
 const ACTION_FRAME_MS: [number, number] = [150, 200];
+const TAP_X_EYES_HOLD_MS = 3000;
 const SLEEPY_Z_FRAME_INDEX = 1;
 const SLEEPY_Z_HOLD_MS: [number, number] = [2000, 4000];
 const IDLE_BLINK_ROLL = 0.5;
@@ -16,7 +17,18 @@ export function getIdleFrameDelayMs(
   return Math.round(min + random() * (max - min));
 }
 
-export function getActionFrameDelayMs(random: () => number = Math.random): number {
+export function getActionFrameDelayMs(
+  animationNameOrRandom: string | (() => number) = Math.random,
+  random: () => number = Math.random,
+): number {
+  if (typeof animationNameOrRandom === 'function') {
+    random = animationNameOrRandom;
+  }
+
+  if (animationNameOrRandom === 'tap_x_eyes') {
+    return TAP_X_EYES_HOLD_MS;
+  }
+
   const [min, max] = ACTION_FRAME_MS;
 
   return Math.round(min + random() * (max - min));

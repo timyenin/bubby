@@ -31,6 +31,11 @@ test('action frame timing stays in the snappy one-shot range', () => {
   assert.equal(getActionFrameDelayMs(() => 1), 200);
 });
 
+test('tap x-eyes action holds for about three seconds', () => {
+  assert.equal(getActionFrameDelayMs('tap_x_eyes', () => 0), 3000);
+  assert.equal(getActionFrameDelayMs('happy_bounce', () => 0), 150);
+});
+
 test('idle frames loop through manifest frame count', () => {
   assert.equal(getNextIdleFrameIndex(0, 2), 1);
   assert.equal(getNextIdleFrameIndex(1, 2), 0);

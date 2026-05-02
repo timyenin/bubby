@@ -4,10 +4,12 @@ import test from 'node:test';
 
 import {
   actionsToReactiveAnimations,
+  chooseTapReactionAnimations,
   createAnimationState,
   enqueueReactiveAnimations,
   finishCurrentAnimation,
   maybeTriggerIdleSpin,
+  triggerTapReaction,
   syncBaseAnimation,
 } from './animationState.ts';
 
@@ -159,6 +161,66 @@ test('idle spin returns to idle after completing', () => {
 
   assert.equal(finished.currentAnimation, 'idle');
   assert.equal(finished.isPlayingOneShot, false);
+});
+
+test('tap reaction helper chooses happy bounces or x-eyes from random value', () => {
+  assert.deepEqual(chooseTapReactionAnimations(() => 0.69), [
+    'happy_bounce',
+    'happy_bounce',
+  ]);
+  assert.deepEqual(chooseTapReactionAnimations(() => 0.7), ['tap_x_eyes']);
+});
+
+test('happy tap reaction queues two happy bounces', () => {
+  const reaction = triggerTapReaction(createAnimationState(), () => 0.1);
+
+  assert.equal(reaction.currentAnimation, 'happy_bounce');
+  assert.deepEqual(reaction.queue, ['happy_bounce']);
+
+  const secondBounce = finishCurrentAnimation(reaction);
+  assert.equal(secondBounce.currentAnimation, 'happy_bounce');
+  assert.deepEqual(secondBounce.queue, []);
+
+  assert.equal(finishCurrentAnimation(secondBounce).currentAnimation, 'idle');
+});
+
+test('x-eyes tap reaction plays as a dedicated one-shot and returns to idle', () => {
+  const reaction = triggerTapReaction(createAnimationState(), () => 0.95);
+
+  assert.equal(reaction.currentAnimation, 'tap_x_eyes');
+  assert.equal(reaction.isPlayingOneShot, true);
+  assert.equal(finishCurrentAnimation(reaction).currentAnimation, 'idle');
+});
+
+test('tap reactions do nothing while sleepy, sick, one-shot, or queued', () => {
+  const sleepy = createAnimationState({
+    baseAnimation: 'sleepy',
+    currentAnimation: 'sleepy',
+  });
+  const sick = createAnimationState({
+    baseAnimation: 'sick',
+    currentAnimation: 'sick',
+  });
+  const eating = enqueueReactiveAnimations(createAnimationState(), ['eating']);
+  const queued = createAnimationState({
+    baseAnimation: 'idle',
+    currentAnimation: 'idle',
+    queue: ['happy_bounce'],
+  });
+
+  assert.equal(triggerTapReaction(sleepy, () => 0).currentAnimation, 'sleepy');
+  assert.equal(triggerTapReaction(sick, () => 0).currentAnimation, 'sick');
+  assert.equal(triggerTapReaction(eating, () => 0).currentAnimation, 'eating');
+  assert.deepEqual(triggerTapReaction(queued, () => 0).queue, ['happy_bounce']);
+});
+
+test('idle spin can still trigger later after a tap reaction completes', () => {
+  const reaction = triggerTapReaction(createAnimationState(), () => 0.1);
+  const finished = finishCurrentAnimation(finishCurrentAnimation(reaction));
+  const spinning = maybeTriggerIdleSpin(finished, 30_000);
+
+  assert.equal(finished.currentAnimation, 'idle');
+  assert.equal(spinning.currentAnimation, 'spin');
 });
 
 test('duplicate queued animations advance playback ids so they can restart', () => {
