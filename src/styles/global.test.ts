@@ -93,19 +93,24 @@ test('messages zone leaves bottom breathing room for newest messages', () => {
 test('chat input sizing avoids clipping typed text on touch devices', () => {
   const chatBarRule = ruleFor('.chat-bar');
   const inputShellRule = ruleFor('.chat-input-shell');
-  const inputRule = ruleForContaining('.chat-input', 'height: 36px');
+  const inputRule = ruleForContaining('.chat-input', 'height: 44px');
   const touchBlock = touchMediaBlock();
+  const chatInputRules = Array.from(
+    css.matchAll(/(?:^|\n)\.chat-input\s*\{(?<body>[^}]*)\}/gs),
+    (match) => match.groups?.body ?? '',
+  ).join('\n');
 
   assert.match(chatBarRule, /overflow:\s*visible/);
   assert.match(inputShellRule, /overflow:\s*visible/);
-  assert.match(inputRule, /min-height:\s*36px/);
-  assert.match(inputRule, /line-height:\s*1\.5/);
+  assert.match(inputRule, /height:\s*44px/);
+  assert.match(inputRule, /min-height:\s*44px/);
+  assert.match(inputRule, /font-size:\s*16px/);
+  assert.match(inputRule, /line-height:\s*normal/);
   assert.match(inputRule, /overflow:\s*visible/);
   assert.match(touchBlock, /\.chat-input\s*\{[^}]*font-size:\s*16px/s);
-  assert.match(touchBlock, /\.chat-input\s*\{[^}]*height:\s*58px/s);
-  assert.match(touchBlock, /\.chat-input\s*\{[^}]*min-height:\s*58px/s);
-  assert.match(touchBlock, /\.chat-input\s*\{[^}]*line-height:\s*1\.6/s);
-  assert.match(touchBlock, /\.chat-input\s*\{[^}]*margin-block:\s*-11px/s);
+  assert.doesNotMatch(chatInputRules, /transform:\s*scale/);
+  assert.doesNotMatch(touchBlock, /width:\s*147%/);
+  assert.doesNotMatch(touchBlock, /margin-block:\s*-/);
 });
 
 test('primary macro input row reserves room for the calorie label', () => {
