@@ -278,14 +278,25 @@ test('protein threshold crossing triggers happy_bounce only when crossing from b
   );
 });
 
-test('play_animation action queues safe happy bounce animations with default and clamped counts', () => {
-  assert.deepEqual(
-    actionsToReactiveAnimations({
-      actions: [{ type: 'play_animation', data: { animation: 'happy_bounce' } }],
-    }),
-    ['happy_bounce'],
-  );
+test('play_animation action queues every safe direct one-shot animation', () => {
+  for (const animation of [
+    'eating',
+    'happy_bounce',
+    'workout',
+    'recovery',
+    'spin',
+    'tap_x_eyes',
+  ]) {
+    assert.deepEqual(
+      actionsToReactiveAnimations({
+        actions: [{ type: 'play_animation', data: { animation } }],
+      }),
+      [animation],
+    );
+  }
+});
 
+test('play_animation count defaults to one and clamps to one through three', () => {
   assert.deepEqual(
     actionsToReactiveAnimations({
       actions: [{ type: 'play_animation', data: { animation: 'happy_bounce', count: 2 } }],
@@ -309,13 +320,6 @@ test('play_animation action queues safe happy bounce animations with default and
 });
 
 test('play_animation ignores unknown animation names safely', () => {
-  assert.deepEqual(
-    actionsToReactiveAnimations({
-      actions: [{ type: 'play_animation', data: { animation: 'spin', count: 2 } }],
-    }),
-    [],
-  );
-
   assert.deepEqual(
     actionsToReactiveAnimations({
       actions: [{ type: 'play_animation', data: { animation: 'totally_not_real', count: 2 } }],

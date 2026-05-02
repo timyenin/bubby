@@ -27,7 +27,14 @@ const LATE_NIGHT_HOUR = 23;
 const LOW_ENERGY_SLEEPY_THRESHOLD = 25;
 const MIN_DIRECT_ANIMATION_COUNT = 1;
 const MAX_DIRECT_ANIMATION_COUNT = 3;
-const SAFE_DIRECT_ANIMATIONS: OneShotAnimation[] = ['happy_bounce', 'tap_x_eyes'];
+const SAFE_DIRECT_ANIMATIONS: OneShotAnimation[] = [
+  'eating',
+  'happy_bounce',
+  'workout',
+  'recovery',
+  'spin',
+  'tap_x_eyes',
+];
 
 export interface AnimationState {
   baseAnimation: LoopingAnimation;
