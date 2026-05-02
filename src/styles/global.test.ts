@@ -22,6 +22,12 @@ function ruleFor(selector) {
   return match?.groups?.body ?? '';
 }
 
+function mobileMediaBlock() {
+  const start = css.indexOf('@media (max-width: 430px)');
+  const end = css.indexOf('@media (min-width: 720px)', start);
+  return start >= 0 && end >= 0 ? css.slice(start, end) : '';
+}
+
 test('theme picker layers above the case content', () => {
   const headerZIndex = zIndexFor('.app-header');
   const caseZIndex = zIndexFor('.bubby-case');
@@ -62,4 +68,19 @@ test('messages zone leaves bottom breathing room for newest messages', () => {
 
   assert.match(messagesRule, /padding:\s*12px\s+12px\s+18px/);
   assert.match(messagesRule, /scroll-padding-bottom:\s*18px/);
+});
+
+test('primary macro input row reserves room for the calorie label', () => {
+  const primaryRule = ruleFor('.macro-input-row-primary');
+  const primaryLabelRule = ruleFor('.macro-input-row-primary span');
+  const mobileBlock = mobileMediaBlock();
+
+  assert.match(primaryRule, /grid-template-columns:\s*1\.7rem\s+minmax\(0,\s*1fr\)/);
+  assert.match(primaryRule, /gap:\s*6px/);
+  assert.match(primaryLabelRule, /white-space:\s*nowrap/);
+  assert.match(mobileBlock, /\.macro-input-row\s*\{[^}]*grid-template-columns:\s*0\.8rem\s+minmax\(54px,\s*1fr\)/s);
+  assert.match(mobileBlock, /\.macro-input-row-primary\s*\{[^}]*grid-template-columns:\s*1\.7rem\s+minmax\(0,\s*1fr\)/s);
+  assert.ok(
+    mobileBlock.indexOf('.macro-input-row-primary') > mobileBlock.indexOf('.macro-input-row'),
+  );
 });

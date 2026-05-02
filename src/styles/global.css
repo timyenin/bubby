@@ -840,7 +840,13 @@ button {
 }
 
 .macro-input-row-primary {
+  grid-template-columns: 1.7rem minmax(0, 1fr);
+  gap: 6px;
   margin-top: 8px;
+}
+
+.macro-input-row-primary span {
+  white-space: nowrap;
 }
 
 .macro-input-row input,
@@ -918,6 +924,10 @@ button {
 
   .macro-input-row {
     grid-template-columns: 0.8rem minmax(54px, 1fr);
+  }
+
+  .macro-input-row-primary {
+    grid-template-columns: 1.7rem minmax(0, 1fr);
   }
 
   .macro-input-row input,
