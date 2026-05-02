@@ -56,3 +56,10 @@ test('vital bar fill uses segmented pixel blocks', () => {
   assert.match(fillRule, /4px/);
   assert.match(fillRule, /6px/);
 });
+
+test('messages zone leaves bottom breathing room for newest messages', () => {
+  const messagesRule = ruleFor('.messages-zone');
+
+  assert.match(messagesRule, /padding:\s*12px\s+12px\s+18px/);
+  assert.match(messagesRule, /scroll-padding-bottom:\s*18px/);
+});

@@ -47,7 +47,7 @@ When making any visual or UX decision not explicitly specified here, choose the 
 
 The home screen contains three distinct visual zones, each with its own rendering rules. Do not mix them.
 
-1. **The case** — the painterly pastel-rainbow toy frame surrounding the LCD. This is a **static background image** (provided as `assets/home_case.png` — see §5). Render it as a normal image, no pixel-perfect rules.
+1. **The case** — the painterly pastel toy frame surrounding the LCD. This is themeable case art rendered from CSS gradients or images under `public/assets/themes/`. Render it as normal smooth UI, no pixel-perfect rules.
 
 2. **The LCD interior** — the screen area containing Bubby. This is **rigorously pixel-perfect**. The swirl background and Bubby sprite both render with `image-rendering: pixelated`, no anti-aliasing, no smooth scaling. This zone is where the retro identity lives.
 
@@ -135,8 +135,8 @@ bubby/
 │       └── global.css
 ├── public/
 │   └── assets/
-│       ├── home_case.png             # The pastel rainbow frame (provided)
 │       ├── lcd_swirl_background.png  # The swirl LCD background (provided)
+│       ├── themes/                   # Themeable case backgrounds
 │       └── sprites/                  # Bubby sprite frames (provided)
 │           ├── manifest.json
 │           ├── frames/
@@ -247,19 +247,18 @@ A `manifest.json` is included in the sprite pack with the exact file paths and d
 - The Bubby sprite renders on top of it (transparent areas of sprite show swirl through)
 - Do not animate, recolor, or modify the swirl in v1
 
-### Home case background
+### Case backgrounds
 
-**Location:** `public/assets/home_case.png`
+**Location:** `public/assets/themes/`
 
 **Specs:**
-- The pastel rainbow case art (matches the design/home_screen_mockup.png reference)
-- Includes the "bubby" wordmark at the top, the lavender LCD frame, the cloud and star/triangle accents
+- Themeable case art surrounds the LCD and chat bar
+- The default pink stars case uses a clean PNG background in `public/assets/themes/`
+- Alternate cases may use CSS gradients or theme image assets
 
 **Use:**
-- This is the static frame around the LCD and chat bar
 - Renders as the background of the home screen container
-- The LCD area is positioned over the case at the location shown in the mockup
-- The hamburger menu (top-left) and settings gear (top-right) are rendered as overlay buttons positioned over the case
+- The LCD, vital bars, header controls, and chat bar are rendered over the active case theme
 
 ### Reference mockup
 

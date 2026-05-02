@@ -87,9 +87,16 @@ function ChatMessages({
   const visibleMessages = messages ?? placeholderMessages;
 
   useEffect(() => {
-    if (messagesRef.current) {
-      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+    const messagesElement = messagesRef.current;
+    if (!messagesElement) {
+      return undefined;
     }
+
+    const frameId = window.requestAnimationFrame(() => {
+      messagesElement.scrollTop = messagesElement.scrollHeight;
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
   }, [visibleMessages, revealedLength]);
 
   return (

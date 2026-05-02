@@ -466,7 +466,8 @@ button {
   border-radius: 18px;
   background: var(--messages-bg);
   backdrop-filter: blur(1.5px);
-  padding: 12px;
+  padding: 12px 12px 18px;
+  scroll-padding-bottom: 18px;
   scrollbar-width: thin;
   scrollbar-color: var(--messages-scrollbar) transparent;
 }
