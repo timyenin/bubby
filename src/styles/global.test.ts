@@ -12,19 +12,39 @@ const css = readFileSync(
 
 function zIndexFor(selector) {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = css.match(new RegExp(`${escapedSelector}\\s*\\{[^}]*z-index:\\s*(\\d+)`, 's'));
+  const match = css.match(new RegExp(`(?:^|\\n)${escapedSelector}\\s*\\{[^}]*z-index:\\s*(\\d+)`, 's'));
   return match ? Number(match[1]) : null;
 }
 
 function ruleFor(selector) {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = css.match(new RegExp(`${escapedSelector}\\s*\\{(?<body>[^}]*)\\}`, 's'));
+  const match = css.match(new RegExp(`(?:^|\\n)${escapedSelector}\\s*\\{(?<body>[^}]*)\\}`, 's'));
   return match?.groups?.body ?? '';
+}
+
+function ruleForContaining(selector, requiredText) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const matches = css.matchAll(new RegExp(`(?:^|\\n)${escapedSelector}\\s*\\{(?<body>[^}]*)\\}`, 'gs'));
+
+  for (const match of matches) {
+    const body = match.groups?.body ?? '';
+    if (body.includes(requiredText)) {
+      return body;
+    }
+  }
+
+  return '';
 }
 
 function mobileMediaBlock() {
   const start = css.indexOf('@media (max-width: 430px)');
   const end = css.indexOf('@media (min-width: 720px)', start);
+  return start >= 0 && end >= 0 ? css.slice(start, end) : '';
+}
+
+function touchMediaBlock() {
+  const start = css.indexOf('@media (hover: none) and (pointer: coarse)');
+  const end = css.indexOf('@media (max-width: 430px)', start);
   return start >= 0 && end >= 0 ? css.slice(start, end) : '';
 }
 
@@ -68,6 +88,24 @@ test('messages zone leaves bottom breathing room for newest messages', () => {
 
   assert.match(messagesRule, /padding:\s*12px\s+12px\s+18px/);
   assert.match(messagesRule, /scroll-padding-bottom:\s*18px/);
+});
+
+test('chat input sizing avoids clipping typed text on touch devices', () => {
+  const chatBarRule = ruleFor('.chat-bar');
+  const inputShellRule = ruleFor('.chat-input-shell');
+  const inputRule = ruleForContaining('.chat-input', 'height: 36px');
+  const touchBlock = touchMediaBlock();
+
+  assert.match(chatBarRule, /overflow:\s*visible/);
+  assert.match(inputShellRule, /overflow:\s*visible/);
+  assert.match(inputRule, /min-height:\s*36px/);
+  assert.match(inputRule, /line-height:\s*1\.5/);
+  assert.match(inputRule, /overflow:\s*visible/);
+  assert.match(touchBlock, /\.chat-input\s*\{[^}]*font-size:\s*16px/s);
+  assert.match(touchBlock, /\.chat-input\s*\{[^}]*height:\s*58px/s);
+  assert.match(touchBlock, /\.chat-input\s*\{[^}]*min-height:\s*58px/s);
+  assert.match(touchBlock, /\.chat-input\s*\{[^}]*line-height:\s*1\.6/s);
+  assert.match(touchBlock, /\.chat-input\s*\{[^}]*margin-block:\s*-11px/s);
 });
 
 test('primary macro input row reserves room for the calorie label', () => {
