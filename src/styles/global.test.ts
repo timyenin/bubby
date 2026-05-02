@@ -96,3 +96,15 @@ test('lcd music notes are clipped inside the lcd window and ignore pointer event
   assert.match(noteRule, /position:\s*absolute/);
   assert.match(noteRule, /animation:/);
 });
+
+test('info modal uses compact themed panel styles', () => {
+  const backdropRule = ruleFor('.info-modal-backdrop');
+  const panelRule = ruleFor('.info-modal-panel');
+  const reportRule = ruleFor('.info-report-form textarea');
+
+  assert.match(backdropRule, /position:\s*absolute/);
+  assert.match(backdropRule, /z-index:\s*30/);
+  assert.match(panelRule, /font-family:\s*"Dogica"/);
+  assert.match(panelRule, /var\(--theme-picker-bg\)/);
+  assert.match(reportRule, /resize:\s*vertical/);
+});

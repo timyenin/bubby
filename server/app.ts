@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 import { createClaudeClient, type ClaudeClient } from './claude.ts';
 import { createChatRouter, loadPrompts, type Prompts } from './routes/chat.ts';
+import { createReportRouter } from './routes/report.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +35,7 @@ export function createApp({
   });
 
   app.use('/api/chat', createChatRouter({ claudeClient, prompts }));
+  app.use('/api/report', createReportRouter());
 
   if (process.env.NODE_ENV === 'production') {
     const distPath = path.resolve(__dirname, '../dist');

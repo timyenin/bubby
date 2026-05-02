@@ -8,6 +8,7 @@
   },
   "rewrites": [
     { "source": "/api/chat", "destination": "/api/chat" },
+    { "source": "/api/report", "destination": "/api/report" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

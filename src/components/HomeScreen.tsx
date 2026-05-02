@@ -1,5 +1,6 @@
 import {
   type CSSProperties,
+  type FormEvent,
   useCallback,
   useEffect,
   useRef,
@@ -49,7 +50,12 @@ import {
 } from '../lib/music.ts';
 import { ONBOARDING_HOME_CLOSING_LINE } from '../lib/onboarding.ts';
 import {
+  getLatestAssistantMessage,
+  submitReport,
+} from '../lib/report.ts';
+import {
   appendMessageToHistory,
+  clearAll,
   getBubbyColorId,
   getBubbyState,
   getConversationHistory,
@@ -228,6 +234,10 @@ function HomeScreen({
   );
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
+  const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportStatus, setReportStatus] = useState<string | null>(null);
+  const [isReportSubmitting, setIsReportSubmitting] = useState(false);
   const rolloutIntervalRef = useRef<number | null>(null);
   const idleSpinTimeoutRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -468,6 +478,36 @@ function HomeScreen({
     setActiveBubbyColorId(nextColorId);
   }
 
+  async function handleReportSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setReportStatus(null);
+    setIsReportSubmitting(true);
+
+    try {
+      await submitReport({
+        reason: reportReason,
+        lastAssistantMessage: getLatestAssistantMessage(resolvedMessages),
+        route: isControlledChat ? 'onboarding' : 'home',
+      });
+      setReportReason('');
+      setReportStatus('reported. thank you.');
+    } catch (error) {
+      console.error('Bubby report failed', error);
+      setReportStatus('report did not send. try again?');
+    } finally {
+      setIsReportSubmitting(false);
+    }
+  }
+
+  function handleClearLocalData() {
+    if (!window.confirm('clear all local bubby data? this resets onboarding.')) {
+      return;
+    }
+
+    clearAll();
+    window.location.reload();
+  }
+
   async function sendHomeMessage() {
     const content = inputValue.trim();
     const imageFiles = attachedImageFiles.slice(0, 4);
@@ -686,6 +726,20 @@ function HomeScreen({
                     ))}
                   </div>
                 </div>
+                <div className="theme-picker-section">
+                  <p className="theme-picker-label">info</p>
+                  <button
+                    className="info-menu-button"
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setIsInfoPanelOpen(true);
+                      setIsThemePickerOpen(false);
+                    }}
+                  >
+                    privacy
+                  </button>
+                </div>
               </div>
             ) : null}
           </div>
@@ -729,6 +783,56 @@ function HomeScreen({
             <ChatBar {...resolvedChatBarProps} />
           </div>
         </section>
+        {isInfoPanelOpen ? (
+          <div className="info-modal-backdrop" role="dialog" aria-modal="true" aria-label="privacy and report">
+            <section className="info-modal-panel">
+              <button
+                className="info-modal-close"
+                type="button"
+                aria-label="close privacy panel"
+                onClick={() => setIsInfoPanelOpen(false)}
+              >
+                x
+              </button>
+              <p className="info-modal-kicker">info</p>
+              <h2>privacy + safety</h2>
+              <a className="info-link" href="/privacy.html" target="_blank" rel="noreferrer">
+                privacy policy
+              </a>
+              <div className="info-disclaimer">
+                <p>Bubby is AI-generated and can be wrong.</p>
+                <p>Bubby is not medical advice.</p>
+                <p>Bubby is not a doctor, dietitian, therapist, or emergency service.</p>
+                <p>
+                  Users with medical conditions, eating disorders, pregnancy, diabetes, or
+                  clinical nutrition needs should talk to a qualified professional.
+                </p>
+              </div>
+              <form className="info-report-form" onSubmit={handleReportSubmit}>
+                <label>
+                  <span>what went wrong?</span>
+                  <textarea
+                    value={reportReason}
+                    onChange={(event) => setReportReason(event.target.value)}
+                    rows={4}
+                    maxLength={2000}
+                  />
+                </label>
+                <button type="submit" disabled={isReportSubmitting}>
+                  {isReportSubmitting ? 'sending' : 'report'}
+                </button>
+                {reportStatus ? <p className="info-report-status">{reportStatus}</p> : null}
+              </form>
+              <button
+                className="info-clear-button"
+                type="button"
+                onClick={handleClearLocalData}
+              >
+                clear local data
+              </button>
+            </section>
+          </div>
+        ) : null}
         {children}
       </section>
     </main>

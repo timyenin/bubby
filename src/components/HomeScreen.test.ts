@@ -68,3 +68,17 @@ test('home screen extends the hamburger menu with music controls', () => {
   assert.match(source, /play\(\)\.catch|await audio\.play/);
   assert.match(source, /musicNotesActive/);
 });
+
+test('home screen extends the hamburger menu with release info controls', () => {
+  assert.match(source, /theme-picker-label">info/);
+  assert.match(source, /setIsInfoPanelOpen\(true\)/);
+  assert.match(source, /isInfoPanelOpen/);
+  assert.match(source, /href="\/privacy\.html"/);
+  assert.match(source, /Bubby is AI-generated and can be wrong/i);
+  assert.match(source, /what went wrong\?/);
+  assert.match(source, /submitReport/);
+  assert.match(source, /getLatestAssistantMessage/);
+  assert.match(source, /clearAll/);
+  assert.match(source, /window\.confirm/);
+  assert.match(source, /window\.location\.reload/);
+});
