@@ -22,6 +22,8 @@ Working checklist for Google Play internal and closed testing.
 
 ## Android / TWA / PWA Packaging
 
+- Follow `docs/android-twa.md` before generating the Android wrapper.
+- Confirm `/manifest.webmanifest` is deployed and contains launcher icons.
 - Confirm the production privacy policy URL is reachable without login.
 - Confirm the TWA/PWA manifest is complete for the Android wrapper.
 - Confirm app icons and splash assets are final enough for testing.
