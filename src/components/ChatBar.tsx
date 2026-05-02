@@ -4,6 +4,7 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
+  type KeyboardEvent,
 } from 'react';
 
 const MAX_ATTACHMENTS = 4;
@@ -68,6 +69,18 @@ function ChatBar({
   );
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (canSend) {
+      onSubmit?.();
+    }
+  }
+
+  function handleInputKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== 'Enter') {
+      return;
+    }
+
     event.preventDefault();
 
     if (canSend) {
@@ -149,15 +162,17 @@ function ChatBar({
             ))}
           </div>
         ) : null}
-        <input
+        <textarea
           className="chat-input"
-          type="text"
+          rows={1}
+          wrap="off"
           placeholder={placeholder}
           disabled={disabled}
           readOnly={disabled}
           tabIndex={disabled ? -1 : 0}
           value={value}
           onChange={(event) => onChange?.(event.target.value)}
+          onKeyDown={handleInputKeyDown}
         />
       </div>
 
