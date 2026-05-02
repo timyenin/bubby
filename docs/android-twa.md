@@ -1,6 +1,6 @@
 # Android TWA Packaging Notes
 
-This project is not generating the Android wrapper yet. These notes prepare Bubby for a Bubblewrap / Trusted Web Activity setup later.
+This project now has a generated Android wrapper under `android/`. These notes document the Bubblewrap / Trusted Web Activity setup and the remaining Play readiness steps.
 
 ## 1. What A TWA Is For Bubby
 
@@ -59,6 +59,51 @@ bubblewrap install
 
 Do not run these commands until the production manifest, icons, privacy policy, and package-name decision are ready.
 
+## 5a. Current Wrapper Setup
+
+Generated on Windows with:
+
+- Java: Eclipse Temurin 17.0.18
+- Android SDK path: `C:\Users\timye\AppData\Local\Android\Sdk`
+- Android command-line tools: 20.0
+- Android platform-tools: 37.0.0
+- Android platform: `platforms;android-35`
+- Android build tools: `35.0.0` and `34.0.0`
+- Bubblewrap CLI: 1.24.1
+- Android output directory: `android/`
+- Package name / applicationId: `app.bubby.mobile`
+
+The wrapper was generated from:
+
+```sh
+bubblewrap init --manifest=https://bubby-pearl.vercel.app/manifest.webmanifest --directory=android
+```
+
+The interactive Bubblewrap prompt was not used because it was unreliable in the non-interactive shell. The wrapper was generated through Bubblewrap Core using the same manifest-derived settings and the package name above.
+
+Build command used:
+
+```sh
+cd android
+bubblewrap build --skipSigning
+```
+
+Build outputs generated locally:
+
+- AAB: `android/app/build/outputs/bundle/release/app-release.aab`
+- APK: `android/app/build/outputs/apk/release/app-release-unsigned.apk`
+- Aligned unsigned APK: `android/app-release-unsigned-aligned.apk`
+
+These are generated artifacts and must not be committed.
+
+Generated SDK settings:
+
+- `compileSdkVersion 36`
+- `targetSdkVersion 35`
+- `minSdkVersion 21`
+
+No keystore was created. Signing is still pending.
+
 ## 6. Digital Asset Links
 
 TWA fullscreen trust requires a valid Digital Asset Links file served from:
@@ -76,6 +121,8 @@ You will need:
 - separate awareness of debug vs release fingerprints
 
 Debug builds and release builds use different signing certificates. If you test with debug signing, the debug fingerprint must be represented for that environment. For Play release builds, use the release/app-signing fingerprint required by the final distribution path.
+
+Current status: `assetlinks.json` is still pending. Create it only after the real signing certificate SHA-256 fingerprint is known.
 
 ## 7. Signing Key Safety
 
