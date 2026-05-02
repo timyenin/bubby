@@ -46,6 +46,14 @@ LOCAL UPLOAD KEY SHA-256:
 
 This is the local upload-key fingerprint. It is not necessarily the final Play App Signing fingerprint used for Play-installed apps.
 
+Play App Signing SHA-256 used for Digital Asset Links:
+
+```text
+F5:BE:BD:17:6B:8C:7D:86:E5:AC:11:33:7F:FF:CA:F0:DB:AC:D2:06:4B:07:9B:B9:F5:72:19:FC:13:D4:3E:95
+```
+
+This Play App Signing fingerprint is the one used in `public/.well-known/assetlinks.json` for the Play-installed Trusted Web Activity. Do not substitute the local upload-key fingerprint for the Play-installed build.
+
 ## Bubblewrap Signing Behavior
 
 Bubblewrap signs through `bubblewrap build` when `--skipSigning` is omitted.
@@ -149,7 +157,7 @@ There are two important signing identities:
 - Local upload key: the keystore created above. Its SHA-256 fingerprint may be useful for local sideload testing.
 - Google Play App Signing certificate: the certificate Google Play uses to sign the app delivered to users.
 
-For the production Trusted Web Activity relationship, use the Play App Signing certificate SHA-256 fingerprint from Play Console once it is available. Do not create `public/.well-known/assetlinks.json` with a placeholder or guessed fingerprint.
+For the production Trusted Web Activity relationship, use the Play App Signing certificate SHA-256 fingerprint from Play Console. Do not create `public/.well-known/assetlinks.json` with a placeholder or guessed fingerprint.
 
 Useful fingerprint command after the keystore exists:
 
@@ -164,5 +172,5 @@ Keep the keystore and passwords private and backed up outside the repo.
 ## Next Steps
 
 1. Upload `android/app-release-bundle.aab` to Play Console internal testing.
-2. Get the Play App Signing SHA-256 certificate fingerprint from Play Console after upload / app signing setup.
-3. Create `public/.well-known/assetlinks.json` only after the real Play fingerprint is known.
+2. Confirm Play Console shows the Play App Signing SHA-256 fingerprint used in `public/.well-known/assetlinks.json`.
+3. After deployment, verify `https://bubby-pearl.vercel.app/.well-known/assetlinks.json`.

@@ -121,9 +121,9 @@ Local upload-key SHA-256 fingerprint:
 46:6F:92:9A:E7:A3:A3:70:8D:06:BA:E9:46:E9:42:8D:6E:37:F8:1B:F6:61:73:75:37:7A:BC:BF:58:19:FF:1B
 ```
 
-This is the LOCAL UPLOAD KEY fingerprint. For the production Trusted Web Activity relationship, create `assetlinks.json` only after Play Console provides the Play App Signing SHA-256 fingerprint.
+This is the LOCAL UPLOAD KEY fingerprint. It is different from the Play App Signing fingerprint and should not be used for the Play-installed Trusted Web Activity.
 
-See `docs/android-signing-notes.md` for the planned Google Play internal-test signing flow. Do not create `assetlinks.json` until the real signing fingerprint is known.
+See `docs/android-signing-notes.md` for the Google Play internal-test signing flow.
 
 ## 6. Digital Asset Links
 
@@ -133,7 +133,7 @@ TWA fullscreen trust requires a valid Digital Asset Links file served from:
 public/.well-known/assetlinks.json
 ```
 
-That file must include the real Android package name and the real SHA-256 signing certificate fingerprint. Do not create `assetlinks.json` with placeholder or fake values.
+That file must include the real Android package name and the real SHA-256 signing certificate fingerprint.
 
 You will need:
 
@@ -143,13 +143,23 @@ You will need:
 
 Debug builds and release builds use different signing certificates. If you test with debug signing, the debug fingerprint must be represented for that environment. For Play release builds, use the release/app-signing fingerprint required by the final distribution path.
 
-Current status: `assetlinks.json` is still pending. Create it only after the real signing certificate SHA-256 fingerprint is known.
+Current status: `public/.well-known/assetlinks.json` has been added using the real Play App Signing SHA-256 fingerprint:
+
+```text
+F5:BE:BD:17:6B:8C:7D:86:E5:AC:11:33:7F:FF:CA:F0:DB:AC:D2:06:4B:07:9B:B9:F5:72:19:FC:13:D4:3E:95
+```
+
+After deployment, verify it is reachable at:
+
+```text
+https://bubby-pearl.vercel.app/.well-known/assetlinks.json
+```
 
 ## 6a. Next Steps After Signed Build
 
 1. Upload `android/app-release-bundle.aab` to Play Console internal testing.
-2. Get the Play App Signing SHA-256 certificate fingerprint from Play Console.
-3. Create `public/.well-known/assetlinks.json` only after that real Play fingerprint is known.
+2. Confirm Play Console shows the Play App Signing SHA-256 fingerprint above.
+3. Deploy the web app and verify `https://bubby-pearl.vercel.app/.well-known/assetlinks.json`.
 
 ## 7. Signing Key Safety
 

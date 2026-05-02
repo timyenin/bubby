@@ -44,6 +44,24 @@ test('PWA icon files exist', () => {
   }
 });
 
+test('Digital Asset Links uses the real Play App Signing fingerprint', () => {
+  const assetLinksPath = 'public/.well-known/assetlinks.json';
+  const playFingerprint = 'F5:BE:BD:17:6B:8C:7D:86:E5:AC:11:33:7F:FF:CA:F0:DB:AC:D2:06:4B:07:9B:B9:F5:72:19:FC:13:D4:3E:95';
+
+  assert.equal(existsSync(assetLinksPath), true);
+
+  const assetLinks = readJson(assetLinksPath);
+  assert.equal(Array.isArray(assetLinks), true);
+  assert.equal(assetLinks.length, 1);
+
+  const [statement] = assetLinks;
+  assert.ok(statement.relation.includes('delegate_permission/common.handle_all_urls'));
+  assert.equal(statement.target.namespace, 'android_app');
+  assert.equal(statement.target.package_name, 'app.bubby.mobile');
+  assert.deepEqual(statement.target.sha256_cert_fingerprints, [playFingerprint]);
+  assert.doesNotMatch(playFingerprint, /REPLACE|FAKE|AA:BB:CC/i);
+});
+
 test('index.html links the manifest and mobile shell metadata', () => {
   const indexHtml = readFileSync('index.html', 'utf8');
   const headCloseIndex = indexHtml.indexOf('</head>');
