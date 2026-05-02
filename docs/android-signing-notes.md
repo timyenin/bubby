@@ -1,6 +1,6 @@
 # Android Signing Notes
 
-These notes prepare Bubby for a Google Play internal-test signed Android App Bundle. They intentionally do not include passwords, keystores, or signing fingerprints.
+These notes prepare Bubby for a Google Play internal-test signed Android App Bundle. They intentionally do not include passwords or keystore files.
 
 ## Current State
 
@@ -23,6 +23,28 @@ bubblewrap build --skipSigning
   - `android/app-release-unsigned-aligned.apk`
 
 These generated artifacts are ignored and must not be committed.
+
+## Signed Build Result
+
+The local signed internal-test build was generated with:
+
+- Package / applicationId: `app.bubby.mobile`
+- `targetSdkVersion 35`
+- `compileSdkVersion 36`
+- Keystore path: `C:\Users\timye\Documents\bubby-signing\bubby-upload-key.jks`
+- Keystore alias: `bubby-upload`
+- Signed AAB: `android/app-release-bundle.aab`
+- Signed APK: `android/app-release-signed.apk`
+
+The signed AAB is the artifact to upload to Play Console internal testing.
+
+LOCAL UPLOAD KEY SHA-256:
+
+```text
+46:6F:92:9A:E7:A3:A3:70:8D:06:BA:E9:46:E9:42:8D:6E:37:F8:1B:F6:61:73:75:37:7A:BC:BF:58:19:FF:1B
+```
+
+This is the local upload-key fingerprint. It is not necessarily the final Play App Signing fingerprint used for Play-installed apps.
 
 ## Bubblewrap Signing Behavior
 
@@ -138,3 +160,9 @@ keytool -list -v `
 ```
 
 Keep the keystore and passwords private and backed up outside the repo.
+
+## Next Steps
+
+1. Upload `android/app-release-bundle.aab` to Play Console internal testing.
+2. Get the Play App Signing SHA-256 certificate fingerprint from Play Console after upload / app signing setup.
+3. Create `public/.well-known/assetlinks.json` only after the real Play fingerprint is known.

@@ -88,7 +88,7 @@ cd android
 bubblewrap build --skipSigning
 ```
 
-Build outputs generated locally:
+Unsigned build outputs generated locally:
 
 - AAB: `android/app/build/outputs/bundle/release/app-release.aab`
 - APK: `android/app/build/outputs/apk/release/app-release-unsigned.apk`
@@ -102,7 +102,26 @@ Generated SDK settings:
 - `targetSdkVersion 35`
 - `minSdkVersion 21`
 
-No keystore was created. Signing is still pending.
+Signed internal-test outputs generated locally:
+
+- Signed AAB: `android/app-release-bundle.aab`
+- Signed APK: `android/app-release-signed.apk`
+
+The signed AAB is the file to upload to Play Console internal testing.
+
+Upload keystore location:
+
+```text
+C:\Users\timye\Documents\bubby-signing\bubby-upload-key.jks
+```
+
+Local upload-key SHA-256 fingerprint:
+
+```text
+46:6F:92:9A:E7:A3:A3:70:8D:06:BA:E9:46:E9:42:8D:6E:37:F8:1B:F6:61:73:75:37:7A:BC:BF:58:19:FF:1B
+```
+
+This is the LOCAL UPLOAD KEY fingerprint. For the production Trusted Web Activity relationship, create `assetlinks.json` only after Play Console provides the Play App Signing SHA-256 fingerprint.
 
 See `docs/android-signing-notes.md` for the planned Google Play internal-test signing flow. Do not create `assetlinks.json` until the real signing fingerprint is known.
 
@@ -125,6 +144,12 @@ You will need:
 Debug builds and release builds use different signing certificates. If you test with debug signing, the debug fingerprint must be represented for that environment. For Play release builds, use the release/app-signing fingerprint required by the final distribution path.
 
 Current status: `assetlinks.json` is still pending. Create it only after the real signing certificate SHA-256 fingerprint is known.
+
+## 6a. Next Steps After Signed Build
+
+1. Upload `android/app-release-bundle.aab` to Play Console internal testing.
+2. Get the Play App Signing SHA-256 certificate fingerprint from Play Console.
+3. Create `public/.well-known/assetlinks.json` only after that real Play fingerprint is known.
 
 ## 7. Signing Key Safety
 
