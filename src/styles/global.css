@@ -1024,14 +1024,14 @@ button {
   background: var(--chat-input-bg);
   backdrop-filter: blur(6px);
   font-family: "Dogica", system-ui, sans-serif;
-  font-size: 16px;
+  font-size: 0.66rem;
   font-weight: 400;
-  line-height: normal;
+  line-height: 1.5;
   letter-spacing: -0.01em;
   word-spacing: -0.04em;
   overflow: visible;
   outline: none;
-  padding: 0 14px;
+  padding: 4px 14px;
   text-overflow: clip;
 }
 
@@ -1046,10 +1046,17 @@ button {
     height: 100dvh;
     max-height: 100dvh;
   }
+}
 
-  .chat-input {
-    font-size: 16px;
-    line-height: normal;
+@supports (-webkit-touch-callout: none) {
+  @media (hover: none) and (pointer: coarse) {
+    .chat-input {
+      width: calc(100% / 0.66);
+      font-size: 16px;
+      line-height: normal;
+      transform: scale(0.66);
+      transform-origin: left center;
+    }
   }
 }
 

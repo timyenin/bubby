@@ -44,8 +44,17 @@ function mobileMediaBlock() {
 
 function touchMediaBlock() {
   const start = css.indexOf('@media (hover: none) and (pointer: coarse)');
-  const end = css.indexOf('@media (max-width: 430px)', start);
+  const iosStart = css.indexOf('@supports (-webkit-touch-callout: none)', start);
+  const mobileStart = css.indexOf('@media (max-width: 430px)', start);
+  const end = iosStart >= 0 ? iosStart : mobileStart;
   return start >= 0 && end >= 0 ? css.slice(start, end) : '';
+}
+
+function iosInputBlock() {
+  const match = css.match(
+    /@supports\s*\(-webkit-touch-callout:\s*none\)\s*\{[\s\S]*?@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*\{[\s\S]*?\.chat-input\s*\{(?<body>[^}]*)\}/,
+  );
+  return match?.groups?.body ?? '';
 }
 
 test('theme picker layers above the case content', () => {
@@ -90,11 +99,12 @@ test('messages zone leaves bottom breathing room for newest messages', () => {
   assert.match(messagesRule, /scroll-padding-bottom:\s*18px/);
 });
 
-test('chat input sizing avoids clipping typed text on touch devices', () => {
+test('chat input sizing avoids clipping while scoping iOS anti-zoom separately', () => {
   const chatBarRule = ruleFor('.chat-bar');
   const inputShellRule = ruleFor('.chat-input-shell');
   const inputRule = ruleForContaining('.chat-input', 'height: 44px');
   const touchBlock = touchMediaBlock();
+  const iosRule = iosInputBlock();
   const chatInputRules = Array.from(
     css.matchAll(/(?:^|\n)\.chat-input\s*\{(?<body>[^}]*)\}/gs),
     (match) => match.groups?.body ?? '',
@@ -104,13 +114,20 @@ test('chat input sizing avoids clipping typed text on touch devices', () => {
   assert.match(inputShellRule, /overflow:\s*visible/);
   assert.match(inputRule, /height:\s*44px/);
   assert.match(inputRule, /min-height:\s*44px/);
-  assert.match(inputRule, /font-size:\s*16px/);
-  assert.match(inputRule, /line-height:\s*normal/);
+  assert.match(inputRule, /font-size:\s*0\.66rem/);
+  assert.doesNotMatch(inputRule, /font-size:\s*0\.72rem/);
+  assert.doesNotMatch(inputRule, /font-size:\s*0\.82rem/);
+  assert.doesNotMatch(inputRule, /font-size:\s*16px/);
+  assert.match(inputRule, /line-height:\s*1\.5/);
+  assert.match(inputRule, /padding:\s*4px\s+14px/);
   assert.match(inputRule, /overflow:\s*visible/);
-  assert.match(touchBlock, /\.chat-input\s*\{[^}]*font-size:\s*16px/s);
   assert.doesNotMatch(chatInputRules, /transform:\s*scale/);
+  assert.doesNotMatch(touchBlock, /\.chat-input\s*\{/);
   assert.doesNotMatch(touchBlock, /width:\s*147%/);
   assert.doesNotMatch(touchBlock, /margin-block:\s*-/);
+  assert.match(iosRule, /font-size:\s*16px/);
+  assert.match(iosRule, /transform:\s*scale\(0\.66\)/);
+  assert.match(iosRule, /width:\s*calc\(100%\s*\/\s*0\.66\)/);
 });
 
 test('primary macro input row reserves room for the calorie label', () => {
