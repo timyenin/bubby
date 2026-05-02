@@ -46,6 +46,7 @@ Working checklist for Google Play internal and closed testing.
 - Run internal test first.
 - Move to closed test only after internal test is stable.
 - If the personal-account 12 testers / 14 days requirement applies, keep the closed test focused on stability and feedback.
+- Use `docs/tester-feedback-template.md` to collect consistent tester reports.
 
 ## Closed Test Rules
 
