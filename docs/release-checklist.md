@@ -5,7 +5,7 @@ Working checklist for Google Play internal and closed testing.
 ## Privacy And Safety
 
 - Publish `public/privacy.html` at a stable production URL.
-- Replace privacy policy placeholders: `[DATE]` and `[YOUR SUPPORT EMAIL]`.
+- Confirm the privacy policy effective date and support email are current.
 - Confirm the in-app hamburger menu links to `/privacy.html`.
 - Confirm the in-app AI response report flow submits to `/api/report`.
 - Confirm reports send only reason, latest visible Bubby message, timestamp, and route.

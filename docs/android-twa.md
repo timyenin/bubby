@@ -104,6 +104,8 @@ Generated SDK settings:
 
 No keystore was created. Signing is still pending.
 
+See `docs/android-signing-notes.md` for the planned Google Play internal-test signing flow. Do not create `assetlinks.json` until the real signing fingerprint is known.
+
 ## 6. Digital Asset Links
 
 TWA fullscreen trust requires a valid Digital Asset Links file served from:

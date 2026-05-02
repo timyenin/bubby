@@ -148,8 +148,7 @@ This deletes local device/browser data controlled by the app. It does not guaran
 
 ## 9. Open Questions Before Production
 
-- Replace `[DATE]` in `public/privacy.html`.
-- Replace `[YOUR SUPPORT EMAIL]` in `public/privacy.html`.
+- Confirm the privacy policy effective date and support email are current before each release track submission.
 - Decide whether AI reports should be stored somewhere durable instead of only logged server-side.
 - Confirm production hosting log retention.
 - Confirm Anthropic data retention/settings for the production account.
