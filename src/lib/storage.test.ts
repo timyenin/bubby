@@ -5,16 +5,22 @@ import test from 'node:test';
 import {
   addMemoryEntry,
   appendMessageToHistory,
+  canonicalizeDailyLog,
   clearAll,
+  collapseDuplicateMeals,
   deleteDailyLog,
   getMemory,
   getBubbyColorId,
+  getCanonicalDailyLog,
   deleteUserProfile,
   getDailyLog,
   getOnboardingComplete,
+  getOrInitCanonicalDailyLog,
   getOrInitDailyLog,
   getUserProfile,
   incrementVital,
+  normalizeMacroTotals,
+  repairDailyLogs,
   removeMemoryByContent,
   removeMemoryEntry,
   setBubbyState,
@@ -23,6 +29,7 @@ import {
   setMemory,
   setOnboardingComplete,
   setUserProfile,
+  sumMealTotals,
   updateMemoryEntry,
 } from './storage.ts';
 
@@ -164,6 +171,123 @@ test('appendMessageToHistory persists optional image data on messages', () => {
     thumbnails,
     fullImages,
   });
+});
+
+test('normalizeMacroTotals rounds calories and macro grams safely', () => {
+  assert.deepEqual(
+    normalizeMacroTotals({
+      calories: '419.6',
+      protein_g: '46.54',
+      carbs_g: '131.20000000000002',
+      fat_g: Number.NaN,
+    }),
+    { calories: 420, protein_g: 46.5, carbs_g: 131.2, fat_g: 0 },
+  );
+});
+
+test('sumMealTotals recomputes rounded totals from meals without float artifacts', () => {
+  const meals = [
+    { id: 'breakfast', description: 'breakfast', logged_at: '2026-05-02T08:00:00.000Z', macros: { calories: 627, protein_g: 67.5, carbs_g: 46.5, fat_g: 16.5 } },
+    { id: 'lunch', description: 'lunch', logged_at: '2026-05-02T12:00:00.000Z', macros: { calories: 395, protein_g: 50, carbs_g: 44, fat_g: 4.5 } },
+    { id: 'grapes', description: '3 grapes', logged_at: '2026-05-02T13:00:00.000Z', macros: { calories: 3, protein_g: 0, carbs_g: 0.7, fat_g: 0 } },
+    { id: 'tomatoes', description: '3 cherry tomatoes', logged_at: '2026-05-02T14:00:00.000Z', macros: { calories: 10, protein_g: 0, carbs_g: 2, fat_g: 0 } },
+    { id: 'yogurt', description: 'yogurt bowl', logged_at: '2026-05-02T18:00:00.000Z', macros: { calories: 420, protein_g: 44, carbs_g: 38, fat_g: 10 } },
+  ];
+
+  assert.deepEqual(sumMealTotals(meals), {
+    calories: 1455,
+    protein_g: 161.5,
+    carbs_g: 131.2,
+    fat_g: 31,
+  });
+});
+
+test('canonicalizeDailyLog repairs stale totals and missing arrays without erasing meals', () => {
+  const canonical = canonicalizeDailyLog({
+    date: '2026-05-02',
+    is_workout_day: true,
+    meals: [
+      {
+        id: 'meal_1',
+        logged_at: '2026-05-02T08:00:00.000Z',
+        description: 'yogurt',
+        macros: { calories: 200, protein_g: 20.04, carbs_g: 12.05, fat_g: 3.94 },
+      },
+    ],
+    totals: { calories: 9999, protein_g: Infinity, carbs_g: 999, fat_g: 999 },
+  });
+
+  assert.equal(canonical.date, '2026-05-02');
+  assert.equal(canonical.is_workout_day, true);
+  assert.deepEqual(canonical.totals, { calories: 200, protein_g: 20, carbs_g: 12.1, fat_g: 3.9 });
+  assert.deepEqual(canonical.adherence_flags, []);
+  assert.equal(canonical.meals.length, 1);
+});
+
+test('canonical daily log getters repair stored malformed logs', () => {
+  setDailyLog('2026-05-02', {
+    date: '2026-05-02',
+    is_workout_day: false,
+    meals: [
+      {
+        id: 'meal_1',
+        logged_at: '2026-05-02T08:00:00.000Z',
+        description: 'eggs',
+        macros: { calories: 210, protein_g: 18, carbs_g: 1, fat_g: 15 },
+      },
+    ],
+    totals: { calories: 1, protein_g: 1, carbs_g: 1, fat_g: 1 },
+    adherence_flags: [],
+  });
+
+  assert.deepEqual(getCanonicalDailyLog('2026-05-02').totals, {
+    calories: 210,
+    protein_g: 18,
+    carbs_g: 1,
+    fat_g: 15,
+  });
+  assert.deepEqual(getDailyLog('2026-05-02').totals, getCanonicalDailyLog('2026-05-02').totals);
+  assert.deepEqual(getOrInitCanonicalDailyLog('2026-05-03').totals, {
+    calories: 0,
+    protein_g: 0,
+    carbs_g: 0,
+    fat_g: 0,
+  });
+});
+
+test('collapseDuplicateMeals removes only exact duplicates inside the short retry window', () => {
+  const meals = [
+    { id: 'meal_1', logged_at: '2026-05-02T12:00:00.000Z', description: ' Chicken Bowl ', macros: { calories: 500, protein_g: 40, carbs_g: 50, fat_g: 12 } },
+    { id: 'meal_2', logged_at: '2026-05-02T12:02:00.000Z', description: 'chicken   bowl', macros: { calories: 500, protein_g: 40, carbs_g: 50, fat_g: 12 } },
+    { id: 'meal_3', logged_at: '2026-05-02T15:30:00.000Z', description: 'chicken bowl', macros: { calories: 500, protein_g: 40, carbs_g: 50, fat_g: 12 } },
+    { id: 'meal_4', logged_at: '2026-05-02T15:31:00.000Z', description: 'chicken bowl', macros: { calories: 510, protein_g: 40, carbs_g: 50, fat_g: 12 } },
+  ];
+
+  assert.deepEqual(
+    collapseDuplicateMeals(meals).map((meal) => meal.id),
+    ['meal_1', 'meal_3', 'meal_4'],
+  );
+});
+
+test('repairDailyLogs recomputes stale totals and collapses obvious duplicate recent meals', () => {
+  setDailyLog('2026-05-02', {
+    date: '2026-05-02',
+    is_workout_day: false,
+    weigh_in_lbs: null,
+    meals: [
+      { id: 'meal_1', logged_at: '2026-05-02T12:00:00.000Z', description: 'rice bowl', macros: { calories: 400, protein_g: 30, carbs_g: 50, fat_g: 8 } },
+      { id: 'meal_2', logged_at: '2026-05-02T12:01:30.000Z', description: 'rice bowl', macros: { calories: 400, protein_g: 30, carbs_g: 50, fat_g: 8 } },
+      { id: 'meal_3', logged_at: '2026-05-02T18:00:00.000Z', description: 'rice bowl', macros: { calories: 400, protein_g: 30, carbs_g: 50, fat_g: 8 } },
+    ],
+    totals: { calories: 999, protein_g: 999, carbs_g: 999, fat_g: 999 },
+    adherence_flags: [],
+  });
+
+  repairDailyLogs('2026-05-02', 1);
+
+  const repaired = getDailyLog('2026-05-02');
+  assert.deepEqual(repaired.meals.map((meal) => meal.id), ['meal_1', 'meal_3']);
+  assert.deepEqual(repaired.totals, { calories: 800, protein_g: 60, carbs_g: 100, fat_g: 16 });
 });
 
 test('bubby color helpers roundtrip the selected color id', () => {

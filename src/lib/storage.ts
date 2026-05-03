@@ -8,6 +8,8 @@ const MEMORY_KEY = `${KEY_PREFIX}memory`;
 const BUBBY_COLOR_KEY = `${KEY_PREFIX}bubby_color`;
 const MAX_HISTORY_MESSAGES = 100;
 const DEFAULT_BUBBY_COLOR_ID = 'default';
+const DUPLICATE_MEAL_WINDOW_MS = 3 * 60 * 1000;
+const MACRO_KEYS: Array<keyof MacroTotals> = ['calories', 'protein_g', 'carbs_g', 'fat_g'];
 
 export type VitalName = 'vitality' | 'mood' | 'strength' | 'energy';
 export type MemoryCategory =
@@ -123,6 +125,10 @@ export interface BubbyMemory {
   last_updated: string;
 }
 
+type DailyLogInput = Partial<Omit<DailyLog, 'meals'>> & {
+  meals?: ReadonlyArray<Partial<Meal> | null | undefined>;
+};
+
 function dailyLogKey(dateString: string): string {
   return `${KEY_PREFIX}daily_log:${dateString}`;
 }
@@ -180,6 +186,131 @@ function emptyDailyLog(dateString: string): DailyLog {
   };
 }
 
+function roundMacroValue(key: keyof MacroTotals, value: unknown): number {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  if (key === 'calories') {
+    return Math.round(numericValue);
+  }
+
+  return Math.round(numericValue * 10) / 10;
+}
+
+function offsetDateString(dateString: string, dayOffset: number): string {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(year, month - 1, day + dayOffset);
+  const dateMonth = String(date.getMonth() + 1).padStart(2, '0');
+  const dateDay = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${dateMonth}-${dateDay}`;
+}
+
+function normalizeMealDescription(description: unknown): string {
+  return String(description ?? '').trim().replace(/\s+/g, ' ');
+}
+
+function normalizeMealDescriptionKey(description: unknown): string {
+  return normalizeMealDescription(description).toLowerCase();
+}
+
+function macroSignature(macros: unknown): string {
+  return JSON.stringify(normalizeMacroTotals(macros));
+}
+
+function mealTimeValue(meal: Pick<Meal, 'logged_at'>): number {
+  const value = Date.parse(meal.logged_at);
+  return Number.isFinite(value) ? value : Number.NaN;
+}
+
+function areDuplicateMeals(a: Meal, b: Meal): boolean {
+  const aTime = mealTimeValue(a);
+  const bTime = mealTimeValue(b);
+
+  return (
+    normalizeMealDescriptionKey(a.description) === normalizeMealDescriptionKey(b.description) &&
+    macroSignature(a.macros) === macroSignature(b.macros) &&
+    Number.isFinite(aTime) &&
+    Number.isFinite(bTime) &&
+    Math.abs(aTime - bTime) <= DUPLICATE_MEAL_WINDOW_MS
+  );
+}
+
+export function normalizeMacroTotals(macros: unknown = {}): MacroTotals {
+  const source = macros && typeof macros === 'object'
+    ? (macros as Partial<Record<keyof MacroTotals, unknown>>)
+    : {};
+
+  return MACRO_KEYS.reduce<MacroTotals>(
+    (normalized, key) => {
+      normalized[key] = roundMacroValue(key, source[key]);
+      return normalized;
+    },
+    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 },
+  );
+}
+
+export function sumMealTotals(
+  meals: ReadonlyArray<Partial<Meal> | null | undefined> = [],
+): MacroTotals {
+  const totals = meals.reduce<MacroTotals>(
+    (runningTotals, meal) => {
+      const macros = normalizeMacroTotals(meal?.macros);
+
+      for (const key of MACRO_KEYS) {
+        runningTotals[key] += macros[key];
+      }
+
+      return runningTotals;
+    },
+    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 },
+  );
+
+  return normalizeMacroTotals(totals);
+}
+
+export function canonicalizeDailyLog(
+  log: DailyLogInput | null | undefined,
+  fallbackDateString = '',
+): DailyLog {
+  const source = log ?? {};
+  const rawWeight = source.weigh_in_lbs;
+  const meals = Array.isArray(source.meals)
+    ? source.meals
+      .filter((meal): meal is Partial<Meal> => meal !== null && typeof meal === 'object')
+      .map((meal, index) => ({
+        id: String(meal.id ?? `meal_${index + 1}`),
+        logged_at: String(meal.logged_at ?? ''),
+        description: normalizeMealDescription(meal.description),
+        macros: normalizeMacroTotals(meal.macros),
+      }))
+    : [];
+
+  return {
+    date: String(source.date ?? fallbackDateString),
+    is_workout_day: Boolean(source.is_workout_day),
+    weigh_in_lbs: rawWeight !== null && rawWeight !== undefined && Number.isFinite(Number(rawWeight))
+      ? Number(rawWeight)
+      : null,
+    meals,
+    totals: sumMealTotals(meals),
+    adherence_flags: Array.isArray(source.adherence_flags)
+      ? source.adherence_flags.map((flag) => String(flag)).filter(Boolean)
+      : [],
+  };
+}
+
+export function collapseDuplicateMeals(
+  meals: ReadonlyArray<Partial<Meal> | null | undefined> = [],
+): Meal[] {
+  const canonicalMeals = canonicalizeDailyLog({ meals }, '').meals;
+  return canonicalMeals.reduce<Meal[]>((keptMeals, meal) => {
+    const isDuplicate = keptMeals.some((keptMeal) => areDuplicateMeals(keptMeal, meal));
+    return isDuplicate ? keptMeals : [...keptMeals, meal];
+  }, []);
+}
+
 function defaultBubbyState(): BubbyState {
   return {
     vitality: 80,
@@ -223,6 +354,46 @@ export function getOrInitDailyLog(dateString: string): DailyLog {
     return existingLog;
   }
   return setDailyLog(dateString, emptyDailyLog(dateString));
+}
+
+export function getCanonicalDailyLog(dateString: string): DailyLog | null {
+  const existingLog = getDailyLog(dateString);
+  if (!existingLog) {
+    return null;
+  }
+
+  const canonicalLog = canonicalizeDailyLog(existingLog, dateString);
+  if (JSON.stringify(existingLog) !== JSON.stringify(canonicalLog)) {
+    return setDailyLog(dateString, canonicalLog);
+  }
+
+  return canonicalLog;
+}
+
+export function getOrInitCanonicalDailyLog(dateString: string): DailyLog {
+  return getCanonicalDailyLog(dateString) ?? setDailyLog(dateString, emptyDailyLog(dateString));
+}
+
+export function repairDailyLogs(anchorDateString: string, dayCount = 7): DailyLog[] {
+  return Array.from({ length: dayCount }, (_, index) => {
+    const dateString = offsetDateString(anchorDateString, index - dayCount + 1);
+    const existingLog = getDailyLog(dateString);
+    if (!existingLog) {
+      return null;
+    }
+
+    const canonicalLog = canonicalizeDailyLog(existingLog, dateString);
+    const meals = collapseDuplicateMeals(canonicalLog.meals);
+    const repairedLog: DailyLog = {
+      ...canonicalLog,
+      meals,
+      totals: sumMealTotals(meals),
+    };
+
+    return JSON.stringify(existingLog) === JSON.stringify(repairedLog)
+      ? canonicalLog
+      : setDailyLog(dateString, repairedLog);
+  }).filter((log): log is DailyLog => log !== null);
 }
 
 export function getPantry(): Pantry | null {

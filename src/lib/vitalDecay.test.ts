@@ -20,6 +20,7 @@ import {
   setDailyLog,
   setUserProfile,
 } from './storage.ts';
+import { applyActions as applyParsedActions } from './actions.ts';
 
 class MemoryStorage {
   #items = new Map();
@@ -338,6 +339,70 @@ test('rapid high-protein recovery clears sick once and keeps vitals clamped', ()
   assert.ok(state.vitality >= 50);
   assert.ok(state.vitality <= 100);
   assert.equal(state.strength, 100);
+});
+
+test('skipped duplicate log_meal mutation does not award extra vitals', () => {
+  setUserProfile(profile());
+  setBubbyState(baseState());
+
+  const mealAction = {
+    type: 'log_meal',
+    data: {
+      description: 'chicken bowl',
+      macros: { calories: 500, protein_g: 40, carbs_g: 50, fat_g: 12 },
+    },
+  };
+  const beforeDailyLog = getDailyLog('2026-04-28');
+  const mutationResults = applyParsedActions([mealAction, mealAction], {
+    dateString: '2026-04-28',
+    now: new Date('2026-04-28T12:00:00.000Z'),
+    returnMutationResult: true,
+  });
+
+  applyActionsVitalEffects([mealAction, mealAction], {
+    dateString: '2026-04-28',
+    beforeDailyLog,
+    mutationResults,
+    now,
+  });
+
+  assert.equal(getDailyLog('2026-04-28').meals.length, 1);
+  assert.equal(getBubbyState().vitality, 83);
+  assert.equal(getBubbyState().strength, 52);
+});
+
+test('replace_daily_log refreshes state without awarding new meal rewards', () => {
+  setUserProfile(profile());
+  setBubbyState(baseState());
+
+  const replaceAction = {
+    type: 'replace_daily_log',
+    data: {
+      date: '2026-04-28',
+      meals: [
+        { description: 'protein day', macros: { calories: 1800, protein_g: 180, carbs_g: 120, fat_g: 50 } },
+      ],
+    },
+  };
+  const mutationResults = applyParsedActions([replaceAction], {
+    now,
+    returnMutationResult: true,
+  });
+
+  applyActionsVitalEffects([replaceAction], {
+    dateString: '2026-04-28',
+    mutationResults,
+    now,
+  });
+
+  assert.deepEqual(getDailyLog('2026-04-28').totals, {
+    calories: 1800,
+    protein_g: 180,
+    carbs_g: 120,
+    fat_g: 50,
+  });
+  assert.equal(getBubbyState().vitality, 80);
+  assert.equal(getBubbyState().strength, 50);
 });
 
 test('applyVitalDecay initializes missing state with default vitals', () => {

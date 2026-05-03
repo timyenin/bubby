@@ -11,9 +11,14 @@ const BASE_PROMPT_URL = new URL('../prompts/bubby_base.md', import.meta.url);
 const ONBOARDING_PROMPT_URL = new URL('../prompts/onboarding.md', import.meta.url);
 const MAX_IMAGE_ATTACHMENTS = 4;
 const CONTEXT_PLACEHOLDERS = [
+  'today_date',
+  'yesterday_date',
   'user_profile',
   'macros_today',
   'macros_remaining',
+  'daily_log_today',
+  'daily_log_yesterday',
+  'recent_daily_summaries',
   'training_today',
   'pantry',
   'recent_history',
@@ -30,9 +35,14 @@ export interface Prompts {
 }
 
 export interface ChatContextPayload {
+  today_date?: unknown;
+  yesterday_date?: unknown;
   user_profile?: unknown;
   macros_today?: unknown;
   macros_remaining?: unknown;
+  daily_log_today?: unknown;
+  daily_log_yesterday?: unknown;
+  recent_daily_summaries?: unknown;
   training_today?: unknown;
   pantry?: unknown;
   recent_history?: unknown;

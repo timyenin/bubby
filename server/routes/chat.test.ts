@@ -9,9 +9,14 @@ import {
 } from './chat.ts';
 
 const basePrompt = [
+  'today date: {{today_date}}',
+  'yesterday date: {{yesterday_date}}',
   'user profile: {{user_profile}}',
   'today: {{macros_today}}',
   'remaining: {{macros_remaining}}',
+  'daily today: {{daily_log_today}}',
+  'daily yesterday: {{daily_log_yesterday}}',
+  'summaries: {{recent_daily_summaries}}',
   'training: {{training_today}}',
   'pantry: {{pantry}}',
   'history: {{recent_history}}',
@@ -37,6 +42,9 @@ test('renderSystemPrompt renders empty context fields as none yet', () => {
   assert.match(rendered, /user profile: \(none yet\)/);
   assert.match(rendered, /today: \(none yet\)/);
   assert.match(rendered, /remaining: \(none yet\)/);
+  assert.match(rendered, /daily today: \(none yet\)/);
+  assert.match(rendered, /daily yesterday: \(none yet\)/);
+  assert.match(rendered, /summaries: \(none yet\)/);
   assert.match(rendered, /training: \(none yet\)/);
   assert.match(rendered, /concern: \(none yet\)/);
   assert.match(rendered, /weight loss: \(none yet\)/);
@@ -50,6 +58,12 @@ test('renderSystemPrompt JSON-stringifies populated context fields', () => {
     context: {
       user_profile: { name: 'Tim' },
       macros_today: { calories: 420, protein_g: 45 },
+      daily_log_today: {
+        date: '2026-05-02',
+        meals: [{ id: 'meal_1', description: 'eggs' }],
+        totals: { calories: 420, protein_g: 45, carbs_g: 38, fat_g: 12 },
+      },
+      recent_daily_summaries: [{ date: '2026-05-02', meal_count: 1 }],
       recent_history: [{ role: 'user', content: 'hi' }],
       concern_level: 'elevated',
       weight_loss_rate: 'too_fast',
@@ -60,6 +74,8 @@ test('renderSystemPrompt JSON-stringifies populated context fields', () => {
 
   assert.match(rendered, /user profile: \{"name":"Tim"\}/);
   assert.match(rendered, /today: \{"calories":420,"protein_g":45\}/);
+  assert.match(rendered, /daily today: \{"date":"2026-05-02","meals":\[\{"id":"meal_1","description":"eggs"\}\]/);
+  assert.match(rendered, /summaries: \[\{"date":"2026-05-02","meal_count":1\}\]/);
   assert.match(rendered, /history: \[\{"role":"user","content":"hi"\}\]/);
   assert.match(rendered, /concern: elevated/);
   assert.match(rendered, /weight loss: too_fast/);

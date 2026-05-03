@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
   buildChatContext,
   buildChatContextFromStorage,
+  calculateMacroDeltas,
   calculateMacrosRemaining,
 } from './chatContext.ts';
 import {
@@ -71,6 +72,14 @@ test('buildChatContext assembles the home chat payload shape', () => {
   const dailyLog = {
     date: '2026-04-27',
     is_workout_day: true,
+    meals: [
+      {
+        id: 'meal_1',
+        logged_at: '2026-04-27T12:00:00.000Z',
+        description: 'lunch',
+        macros: { calories: 500, protein_g: 40, carbs_g: 70, fat_g: 10 },
+      },
+    ],
     totals: { calories: 500, protein_g: 40, carbs_g: 70, fat_g: 10 },
   };
   const pantry = { items: [{ name: 'eggs', category: 'protein', always: true }] };
@@ -127,6 +136,14 @@ test('buildChatContextFromStorage reads localStorage and caps recent history at 
   setDailyLog('2026-04-27', {
     date: '2026-04-27',
     is_workout_day: false,
+    meals: [
+      {
+        id: 'meal_1',
+        logged_at: '2026-04-27T12:00:00.000Z',
+        description: 'snack',
+        macros: { calories: 100, protein_g: 10, carbs_g: 12, fat_g: 3 },
+      },
+    ],
     totals: { calories: 100, protein_g: 10, carbs_g: 12, fat_g: 3 },
   });
   setBubbyState({
@@ -161,6 +178,153 @@ test('buildChatContextFromStorage reads localStorage and caps recent history at 
     protein_g: 10,
     carbs_g: 12,
     fat_g: 3,
+  });
+});
+
+test('buildChatContextFromStorage includes canonical today meals and macro deltas', () => {
+  setUserProfile({
+    ...profile,
+    macro_targets: {
+      rest_day: { calories: 1950, protein_g: 160, carbs_g: 100, fat_g: 50 },
+      workout_day: { calories: 2200, protein_g: 170, carbs_g: 180, fat_g: 60 },
+    },
+  });
+  setDailyLog('2026-05-02', {
+    date: '2026-05-02',
+    is_workout_day: false,
+    weigh_in_lbs: null,
+    meals: [
+      { id: 'breakfast', logged_at: '2026-05-02T08:00:00.000Z', description: 'breakfast', macros: { calories: 627, protein_g: 67.5, carbs_g: 46.5, fat_g: 16.5 } },
+      { id: 'lunch', logged_at: '2026-05-02T12:00:00.000Z', description: 'lunch', macros: { calories: 395, protein_g: 50, carbs_g: 44, fat_g: 4.5 } },
+      { id: 'grapes', logged_at: '2026-05-02T13:00:00.000Z', description: '3 grapes', macros: { calories: 3, protein_g: 0, carbs_g: 0.7, fat_g: 0 } },
+      { id: 'tomatoes', logged_at: '2026-05-02T14:00:00.000Z', description: '3 cherry tomatoes', macros: { calories: 10, protein_g: 0, carbs_g: 2, fat_g: 0 } },
+      { id: 'yogurt', logged_at: '2026-05-02T18:00:00.000Z', description: 'yogurt bowl', macros: { calories: 420, protein_g: 44, carbs_g: 38, fat_g: 10 } },
+    ],
+    totals: { calories: 9999, protein_g: 999, carbs_g: 999, fat_g: 999 },
+    adherence_flags: [],
+  });
+
+  const context = buildChatContextFromStorage({
+    dateString: '2026-05-02',
+    now: new Date('2026-05-02T22:00:00.000Z'),
+  });
+
+  assert.equal(context.today_date, '2026-05-02');
+  assert.equal(context.yesterday_date, '2026-05-01');
+  assert.equal(context.daily_log_today.meals.length, 5);
+  assert.deepEqual(context.daily_log_today.meals[0], {
+    id: 'breakfast',
+    logged_at: '2026-05-02T08:00:00.000Z',
+    description: 'breakfast',
+    macros: { calories: 627, protein_g: 67.5, carbs_g: 46.5, fat_g: 16.5 },
+  });
+  assert.deepEqual(context.daily_log_today.totals, {
+    calories: 1455,
+    protein_g: 161.5,
+    carbs_g: 131.2,
+    fat_g: 31,
+  });
+  assert.deepEqual(context.daily_log_today.remaining, {
+    calories: 495,
+    protein_g: 0,
+    carbs_g: 0,
+    fat_g: 19,
+  });
+  assert.deepEqual(context.daily_log_today.deltas, {
+    calories: 495,
+    protein_g: -1.5,
+    carbs_g: -31.2,
+    fat_g: 19,
+  });
+});
+
+test('buildChatContextFromStorage includes yesterday and compact recent daily summaries', () => {
+  setUserProfile(profile);
+  for (let day = 26; day <= 28; day += 1) {
+    const date = `2026-04-${day}`;
+    setDailyLog(date, {
+      date,
+      is_workout_day: day === 28,
+      weigh_in_lbs: null,
+      meals: [
+        { id: `meal_${day}`, logged_at: `${date}T12:00:00.000Z`, description: `meal ${day}`, macros: { calories: day, protein_g: 10, carbs_g: 5, fat_g: 2 } },
+      ],
+      totals: { calories: 999, protein_g: 999, carbs_g: 999, fat_g: 999 },
+      adherence_flags: [],
+    });
+  }
+
+  const context = buildChatContextFromStorage({
+    dateString: '2026-04-28',
+    now: new Date('2026-04-28T16:34:00.000Z'),
+  });
+
+  assert.equal(context.daily_log_yesterday.date, '2026-04-27');
+  assert.equal(context.daily_log_yesterday.meals[0].description, 'meal 27');
+  assert.deepEqual(context.daily_log_yesterday.totals, {
+    calories: 27,
+    protein_g: 10,
+    carbs_g: 5,
+    fat_g: 2,
+  });
+  assert.deepEqual(
+    context.recent_daily_summaries.filter(Boolean).map((summary) => ({
+      date: summary.date,
+      meal_count: summary.meal_count,
+      is_workout_day: summary.is_workout_day,
+    })),
+    [
+      { date: '2026-04-26', meal_count: 1, is_workout_day: false },
+      { date: '2026-04-27', meal_count: 1, is_workout_day: false },
+      { date: '2026-04-28', meal_count: 1, is_workout_day: true },
+    ],
+  );
+  assert.equal(context.recent_daily_summaries.length <= 7, true);
+});
+
+test('calculateMacroDeltas returns signed remaining or overage values with clean rounding', () => {
+  assert.deepEqual(
+    calculateMacroDeltas(
+      { calories: 1950, protein_g: 160, carbs_g: 100, fat_g: 50 },
+      { calories: 1455, protein_g: 161.5, carbs_g: 131.2, fat_g: 31 },
+    ),
+    { calories: 495, protein_g: -1.5, carbs_g: -31.2, fat_g: 19 },
+  );
+});
+
+test('context remaining switches between rest and workout targets', () => {
+  setUserProfile({
+    ...profile,
+    macro_targets: {
+      rest_day: { calories: 1000, protein_g: 100, carbs_g: 100, fat_g: 50 },
+      workout_day: { calories: 1200, protein_g: 110, carbs_g: 140, fat_g: 55 },
+    },
+  });
+  setDailyLog('2026-04-28', {
+    date: '2026-04-28',
+    is_workout_day: true,
+    weigh_in_lbs: null,
+    meals: [{ id: 'meal_1', logged_at: '2026-04-28T12:00:00.000Z', description: 'meal', macros: { calories: 500, protein_g: 60, carbs_g: 70, fat_g: 20 } }],
+    totals: { calories: 500, protein_g: 60, carbs_g: 70, fat_g: 20 },
+    adherence_flags: [],
+  });
+
+  const context = buildChatContextFromStorage({
+    dateString: '2026-04-28',
+    now: new Date('2026-04-28T16:34:00.000Z'),
+  });
+
+  assert.deepEqual(context.daily_log_today.target, {
+    calories: 1200,
+    protein_g: 110,
+    carbs_g: 140,
+    fat_g: 55,
+  });
+  assert.deepEqual(context.daily_log_today.remaining, {
+    calories: 700,
+    protein_g: 50,
+    carbs_g: 70,
+    fat_g: 35,
   });
 });
 
@@ -208,6 +372,44 @@ test('buildChatContextFromStorage includes memory entries when memory exists in 
       updated_at: '2026-04-27T08:00:00.000Z',
     },
   ]);
+});
+
+test('buildChatContextFromStorage filters malformed memory entries without crashing', () => {
+  setMemory({
+    entries: [
+      null,
+      { id: 'bad', category: 'preference' },
+      {
+        id: 'memory_1',
+        content: 'hates mushrooms',
+        category: 'preference',
+        created_at: '2026-04-27T08:00:00.000Z',
+        updated_at: '2026-04-27T08:00:00.000Z',
+      },
+      {
+        id: 'memory_2',
+        content: 'works doubles on weekends',
+        category: 'schedule',
+        created_at: '2026-04-27T08:00:00.000Z',
+        updated_at: '2026-04-27T08:00:00.000Z',
+      },
+    ],
+    last_updated: '2026-04-27T08:00:00.000Z',
+  });
+
+  const context = buildChatContextFromStorage({
+    dateString: '2026-04-27',
+    currentTime: '2026-04-27T16:34:00.000Z',
+    now: new Date('2026-04-27T16:34:00.000Z'),
+  });
+
+  assert.deepEqual(
+    context.memory.map((entry) => ({ content: entry.content, category: entry.category })),
+    [
+      { content: 'hates mushrooms', category: 'preference' },
+      { content: 'works doubles on weekends', category: 'schedule' },
+    ],
+  );
 });
 
 test('buildChatContextFromStorage includes null memory when no memory in storage', () => {

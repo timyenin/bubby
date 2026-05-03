@@ -36,6 +36,18 @@ export function todayString(): string {
   return formatDate(new Date());
 }
 
+export function dateStringForOffset(now: Date = new Date(), offsetDays = 0): string {
+  return formatDate(new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + offsetDays,
+  ));
+}
+
+export function yesterdayString(now: Date = new Date()): string {
+  return dateStringForOffset(now, -1);
+}
+
 /**
  * Return the integer number of local calendar days from dateString to today.
  */

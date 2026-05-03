@@ -235,6 +235,16 @@ test('update_pantry adds and removes pantry items without duplicates', () => {
   );
 });
 
+test('set_workout_day respects a provided valid action date', () => {
+  applyAction(
+    { type: 'set_workout_day', data: { date: '2026-04-25', is_workout_day: true } },
+    { dateString: '2026-04-27' },
+  );
+
+  assert.equal(getDailyLog('2026-04-25').is_workout_day, true);
+  assert.equal(getDailyLog('2026-04-27'), null);
+});
+
 test('update_pantry_macros updates macros on an existing pantry item', () => {
   setPantry({
     items: [{ name: 'chicken breast', category: 'protein', always: true }],
@@ -474,7 +484,7 @@ test("forget_memory with no match does nothing and doesn't error", () => {
   assert.equal(getMemory().entries.length, 1);
 });
 
-test('applyActions is idempotent for set-like updates and log_meal is intentionally additive', () => {
+test('applyActions is idempotent for set-like updates and skips retry duplicate meals', () => {
   setPantry({
     items: [{ name: 'eggs', category: 'protein', always: true }],
     last_updated: '2026-04-27T08:00:00.000Z',
@@ -499,5 +509,212 @@ test('applyActions is idempotent for set-like updates and log_meal is intentiona
     now: new Date('2026-04-27T12:00:00.000Z'),
   });
 
-  assert.equal(getDailyLog('2026-04-27').meals.length, 2);
+  assert.equal(getDailyLog('2026-04-27').meals.length, 1);
+});
+
+test('log_meal duplicate protection is exact and time-window conservative', () => {
+  const mealAction = {
+    type: 'log_meal',
+    data: {
+      description: 'same meal',
+      macros: { calories: 300, protein_g: 25, carbs_g: 30, fat_g: 8 },
+    },
+  };
+
+  const first = applyAction(mealAction, {
+    dateString: '2026-04-27',
+    now: new Date('2026-04-27T12:00:00.000Z'),
+    returnMutationResult: true,
+  });
+  const duplicate = applyAction(mealAction, {
+    dateString: '2026-04-27',
+    now: new Date('2026-04-27T12:02:00.000Z'),
+    returnMutationResult: true,
+  });
+  const later = applyAction(mealAction, {
+    dateString: '2026-04-27',
+    now: new Date('2026-04-27T15:30:00.000Z'),
+    returnMutationResult: true,
+  });
+  const differentMacros = applyAction(
+    {
+      ...mealAction,
+      data: {
+        ...mealAction.data,
+        macros: { calories: 301, protein_g: 25, carbs_g: 30, fat_g: 8 },
+      },
+    },
+    {
+      dateString: '2026-04-27',
+      now: new Date('2026-04-27T15:31:00.000Z'),
+      returnMutationResult: true,
+    },
+  );
+
+  assert.equal(first.status, 'inserted');
+  assert.equal(duplicate.status, 'skipped_duplicate');
+  assert.equal(later.status, 'inserted');
+  assert.equal(differentMacros.status, 'inserted');
+  assert.equal(getDailyLog('2026-04-27').meals.length, 3);
+});
+
+test('delete_meal removes the matching meal and recomputes totals', () => {
+  setDailyLog('2026-04-27', {
+    date: '2026-04-27',
+    is_workout_day: false,
+    weigh_in_lbs: null,
+    meals: [
+      { id: 'meal_keep', logged_at: '2026-04-27T08:00:00.000Z', description: 'eggs', macros: { calories: 200, protein_g: 18, carbs_g: 1, fat_g: 14 } },
+      { id: 'meal_remove', logged_at: '2026-04-27T12:00:00.000Z', description: 'rice', macros: { calories: 300, protein_g: 4, carbs_g: 60, fat_g: 2 } },
+    ],
+    totals: { calories: 500, protein_g: 22, carbs_g: 61, fat_g: 16 },
+    adherence_flags: [],
+  });
+
+  const result = applyAction(
+    { type: 'delete_meal', data: { date: '2026-04-27', meal_id: 'meal_remove' } },
+    { returnMutationResult: true },
+  );
+
+  assert.equal(result.status, 'deleted');
+  assert.deepEqual(getDailyLog('2026-04-27').meals.map((meal) => meal.id), ['meal_keep']);
+  assert.deepEqual(getDailyLog('2026-04-27').totals, {
+    calories: 200,
+    protein_g: 18,
+    carbs_g: 1,
+    fat_g: 14,
+  });
+});
+
+test('delete_meal with an unknown meal id is a safe no-op', () => {
+  setDailyLog('2026-04-27', {
+    date: '2026-04-27',
+    is_workout_day: false,
+    weigh_in_lbs: null,
+    meals: [{ id: 'meal_keep', logged_at: '2026-04-27T08:00:00.000Z', description: 'eggs', macros: { calories: 200, protein_g: 18, carbs_g: 1, fat_g: 14 } }],
+    totals: { calories: 200, protein_g: 18, carbs_g: 1, fat_g: 14 },
+    adherence_flags: [],
+  });
+
+  const result = applyAction(
+    { type: 'delete_meal', data: { date: '2026-04-27', meal_id: 'missing' } },
+    { returnMutationResult: true },
+  );
+
+  assert.equal(result.status, 'noop');
+  assert.equal(getDailyLog('2026-04-27').meals.length, 1);
+});
+
+test('update_meal changes provided fields and recomputes totals', () => {
+  setDailyLog('2026-04-27', {
+    date: '2026-04-27',
+    is_workout_day: false,
+    weigh_in_lbs: null,
+    meals: [{ id: 'meal_1', logged_at: '2026-04-27T08:00:00.000Z', description: 'eggs', macros: { calories: 200, protein_g: 18, carbs_g: 1, fat_g: 14 } }],
+    totals: { calories: 200, protein_g: 18, carbs_g: 1, fat_g: 14 },
+    adherence_flags: [],
+  });
+
+  const result = applyAction(
+    {
+      type: 'update_meal',
+      data: {
+        date: '2026-04-27',
+        meal_id: 'meal_1',
+        description: 'eggs and toast',
+        macros: { calories: 320, protein_g: 22, carbs_g: 24, fat_g: 15 },
+      },
+    },
+    { returnMutationResult: true },
+  );
+
+  assert.equal(result.status, 'updated');
+  assert.equal(getDailyLog('2026-04-27').meals[0].description, 'eggs and toast');
+  assert.equal(getDailyLog('2026-04-27').meals[0].logged_at, '2026-04-27T08:00:00.000Z');
+  assert.deepEqual(getDailyLog('2026-04-27').totals, {
+    calories: 320,
+    protein_g: 22,
+    carbs_g: 24,
+    fat_g: 15,
+  });
+});
+
+test('replace_daily_log replaces meals, preserves weigh-in, and clears stale derived flags', () => {
+  setDailyLog('2026-05-02', {
+    date: '2026-05-02',
+    is_workout_day: true,
+    weigh_in_lbs: 164.4,
+    meals: [{ id: 'old', logged_at: '2026-05-02T08:00:00.000Z', description: 'wrong', macros: { calories: 999, protein_g: 0, carbs_g: 0, fat_g: 0 } }],
+    totals: { calories: 999, protein_g: 0, carbs_g: 0, fat_g: 0 },
+    adherence_flags: [
+      'protein_target_vitals_awarded',
+      'calorie_floor_penalty_applied',
+      'sick_recovery_meals:3',
+      'manual_note',
+    ],
+  });
+
+  const result = applyAction(
+    {
+      type: 'replace_daily_log',
+      data: {
+        date: '2026-05-02',
+        meals: [
+          { description: 'breakfast', macros: { calories: 627, protein_g: 67.5, carbs_g: 46.5, fat_g: 16.5 } },
+          { description: 'lunch', macros: { calories: 395, protein_g: 50, carbs_g: 44, fat_g: 4.5 } },
+          { description: '3 grapes', macros: { calories: 3, protein_g: 0, carbs_g: 0.7, fat_g: 0 } },
+          { description: '3 cherry tomatoes', macros: { calories: 10, protein_g: 0, carbs_g: 2, fat_g: 0 } },
+          { description: 'yogurt bowl', macros: { calories: 420, protein_g: 44, carbs_g: 38, fat_g: 10 } },
+        ],
+      },
+    },
+    {
+      now: new Date('2026-05-02T20:00:00.000Z'),
+      returnMutationResult: true,
+    },
+  );
+
+  const log = getDailyLog('2026-05-02');
+  assert.equal(result.status, 'replaced');
+  assert.equal(log.weigh_in_lbs, 164.4);
+  assert.equal(log.is_workout_day, true);
+  assert.deepEqual(log.totals, { calories: 1455, protein_g: 161.5, carbs_g: 131.2, fat_g: 31 });
+  assert.deepEqual(log.adherence_flags, ['manual_note']);
+  assert.match(log.meals[0].id, /^meal_\d+_1$/);
+});
+
+test('replace_daily_log with invalid meals is a safe no-op', () => {
+  const result = applyAction(
+    { type: 'replace_daily_log', data: { date: '2026-05-02', meals: [] } },
+    { returnMutationResult: true },
+  );
+
+  assert.equal(result.status, 'noop');
+  assert.equal(getDailyLog('2026-05-02'), null);
+});
+
+test('applyActions can return mutation metadata without breaking legacy storage results', () => {
+  const actions = [
+    {
+      type: 'log_meal',
+      data: {
+        description: 'eggs',
+        macros: { calories: 210, protein_g: 18, carbs_g: 1, fat_g: 15 },
+      },
+    },
+    { type: 'play_animation', data: { animation: 'spin' } },
+  ];
+
+  const metadata = applyActions(actions, {
+    dateString: '2026-04-27',
+    now: new Date('2026-04-27T12:00:00.000Z'),
+    returnMutationResult: true,
+  });
+
+  assert.deepEqual(
+    metadata.map((result) => result.status),
+    ['inserted', 'noop'],
+  );
+  assert.equal(metadata[0].changed, true);
+  assert.equal(metadata[1].changed, false);
 });

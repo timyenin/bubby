@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import defaultChatHandler, { buildUserContent, createVercelChatHandler } from './chat.ts';
+import defaultChatHandler, { buildUserContent, createVercelChatHandler, renderSystemPrompt } from './chat.ts';
 
 function createMockResponse() {
   return {
@@ -165,6 +165,34 @@ test('vercel chat handler lazily loads prompts for valid POST requests', async (
   assert.equal(response.statusCode, 200);
   assert.equal(promptLoaderWasCalled, true);
   assert.match(capturedRequest.system, /lazy profile: \{"name":"Tim"\}/);
+});
+
+test('vercel prompt renderer includes canonical daily log placeholders', () => {
+  const rendered = renderSystemPrompt({
+    basePrompt: [
+      'today date: {{today_date}}',
+      'yesterday date: {{yesterday_date}}',
+      'daily today: {{daily_log_today}}',
+      'daily yesterday: {{daily_log_yesterday}}',
+      'summaries: {{recent_daily_summaries}}',
+    ].join('\n'),
+    onboardingPrompt: '',
+    context: {
+      today_date: '2026-05-02',
+      yesterday_date: '2026-05-01',
+      daily_log_today: {
+        date: '2026-05-02',
+        meals: [{ id: 'meal_1', description: 'eggs' }],
+      },
+      daily_log_yesterday: { date: '2026-05-01', meals: [] },
+      recent_daily_summaries: [{ date: '2026-05-02', meal_count: 1 }],
+    },
+  });
+
+  assert.match(rendered, /today date: 2026-05-02/);
+  assert.match(rendered, /yesterday date: 2026-05-01/);
+  assert.match(rendered, /daily today: \{"date":"2026-05-02","meals":\[\{"id":"meal_1","description":"eggs"\}\]\}/);
+  assert.match(rendered, /summaries: \[\{"date":"2026-05-02","meal_count":1\}\]/);
 });
 
 test('vercel buildUserContent formats multiple images before one text block', () => {

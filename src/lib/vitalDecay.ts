@@ -1,6 +1,7 @@
 import { formatDate, todayString } from './dates.ts';
 import {
   getBubbyState,
+  getCanonicalDailyLog,
   getDailyLog,
   getUserProfile,
   setBubbyState,
@@ -10,7 +11,7 @@ import {
   type UserProfile,
   type VitalName,
 } from './storage.ts';
-import type { ParsedAction } from './actions.ts';
+import type { ActionMutationResult, ParsedAction } from './actions.ts';
 
 export const CALORIE_FLOOR_PENALTY_FLAG = 'calorie_floor_penalty_applied';
 export const PROTEIN_TARGET_REWARD_FLAG = 'protein_target_vitals_awarded';
@@ -226,7 +227,7 @@ function recentFloorBreaches(
 
   return Array.from({ length: dayCount }, (_, index) => {
     const dateString = offsetDateString(currentDateString, -index);
-    return isBelowCalorieFloor(getDailyLog(dateString), userProfile);
+    return isBelowCalorieFloor(getCanonicalDailyLog(dateString), userProfile);
   });
 }
 
@@ -361,7 +362,7 @@ export function applyCalorieFloorPenaltyForDate(
     userProfile = getUserProfile(),
   }: { now?: Date; userProfile?: UserProfile | null } = {},
 ): BubbyState | null {
-  const dailyLog = getDailyLog(dateString);
+  const dailyLog = getCanonicalDailyLog(dateString);
   if (
     !dailyLog ||
     !isBelowCalorieFloor(dailyLog, userProfile) ||
@@ -382,23 +383,29 @@ export function applyActionVitalEffects(
     now = new Date(),
     beforeDailyLog = null,
     userProfile = getUserProfile(),
+    mutationResult = null,
   }: {
     dateString?: string;
     now?: Date;
     beforeDailyLog?: DailyLog | null;
     userProfile?: UserProfile | null;
+    mutationResult?: ActionMutationResult | null;
   } = {},
 ): BubbyState {
   if (!action?.type) {
     return getStateOrDefault(now);
   }
 
-  const targetDateString = resolveActionDate(action.data?.date, dateString);
+  if (mutationResult && !mutationResult.changed) {
+    return refreshSickState({ now, userProfile });
+  }
+
+  const targetDateString = mutationResult?.dateString ?? resolveActionDate(action.data?.date, dateString);
   const deltas: VitalDeltas = {};
 
   if (action.type === 'log_meal') {
     const protein = Number(action.data?.macros?.protein_g ?? 0);
-    const afterDailyLog = getDailyLog(targetDateString);
+    const afterDailyLog = getCanonicalDailyLog(targetDateString);
 
     if (protein >= 20) {
       deltas.vitality = (deltas.vitality ?? 0) + 3;
@@ -453,24 +460,28 @@ export function applyActionsVitalEffects(
     now = new Date(),
     beforeDailyLog = null,
     userProfile = getUserProfile(),
+    mutationResults = null,
   }: {
     dateString?: string;
     now?: Date;
     beforeDailyLog?: DailyLog | null;
     userProfile?: UserProfile | null;
+    mutationResults?: ActionMutationResult[] | null;
   } = {},
 ): BubbyState {
   let runningBeforeDailyLog = beforeDailyLog;
 
-  for (const action of actions) {
+  for (const [index, action] of actions.entries()) {
+    const mutationResult = mutationResults?.[index] ?? null;
     applyActionVitalEffects(action, {
       dateString,
       now,
       beforeDailyLog: runningBeforeDailyLog,
       userProfile,
+      mutationResult,
     });
 
-    runningBeforeDailyLog = getDailyLog(dateString);
+    runningBeforeDailyLog = getCanonicalDailyLog(mutationResult?.dateString ?? dateString);
   }
 
   return getStateOrDefault(now);

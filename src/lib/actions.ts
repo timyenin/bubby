@@ -1,13 +1,17 @@
 import { todayString } from './dates.ts';
 import {
   addMemoryEntry,
-  getOrInitDailyLog,
+  canonicalizeDailyLog,
+  getCanonicalDailyLog,
+  getOrInitCanonicalDailyLog,
   getPantry,
   getUserProfile,
+  normalizeMacroTotals,
   removeMemoryByContent,
   setDailyLog,
   setPantry,
   setUserProfile,
+  sumMealTotals,
   type DailyLog,
   type MacroTotals,
   type MemoryCategory,
@@ -31,13 +35,18 @@ export type ActionType =
   | 'update_macros'
   | 'save_memory'
   | 'forget_memory'
+  | 'delete_meal'
+  | 'update_meal'
+  | 'replace_daily_log'
   | 'play_animation'
   | 'onboarding_complete';
 
 export interface ActionData {
   description?: string;
   date?: string;
+  meal_id?: string;
   macros?: MacroActionPayload;
+  meals?: unknown[];
   weight_lbs?: number | string;
   is_workout_day?: boolean;
   training_type?: string;
@@ -65,6 +74,29 @@ export interface ParsedAction {
 export interface ApplyActionOptions {
   dateString?: string;
   now?: Date;
+  returnMutationResult?: boolean;
+}
+
+export type ActionMutationStatus =
+  | 'inserted'
+  | 'updated'
+  | 'deleted'
+  | 'replaced'
+  | 'skipped_duplicate'
+  | 'noop';
+
+export interface ActionMutationResult {
+  action: ParsedAction | null | undefined;
+  type: string | null | undefined;
+  status: ActionMutationStatus;
+  changed: boolean;
+  dateString?: string;
+  value?: unknown;
+}
+
+interface AppliedActionResult<T = unknown> {
+  value: T;
+  mutation: ActionMutationResult;
 }
 
 const ACTION_PATTERN = /\[ACTION\]([\s\S]*?)\[\/ACTION\]/g;
@@ -78,6 +110,12 @@ const MEMORY_CATEGORIES: MemoryCategory[] = [
   'schedule',
   'other',
 ];
+const DERIVED_ADHERENCE_FLAG_PREFIXES = [
+  'calorie_floor_penalty_applied',
+  'protein_target_vitals_awarded',
+  'sick_recovery_meals:',
+];
+const DUPLICATE_MEAL_WINDOW_MS = 3 * 60 * 1000;
 
 function timestampFrom(now: Date | string | number): string {
   return now instanceof Date ? now.toISOString() : new Date(now).toISOString();
@@ -119,14 +157,7 @@ function normalizeStringList(value: unknown): string[] {
 }
 
 function normalizeMacros(macros: ActionData['macros'] = {}): MacroTotals {
-  return MACRO_KEYS.reduce<MacroTotals>(
-    (normalized, key) => {
-      const value = Number(macros?.[key] ?? 0);
-      normalized[key] = Number.isFinite(value) ? value : 0;
-      return normalized;
-    },
-    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 },
-  );
+  return normalizeMacroTotals(macros);
 }
 
 function normalizeMacroUpdates(macros: ActionData['rest_day'] = {}): Partial<MacroTotals> {
@@ -166,48 +197,118 @@ function normalizePantryItemMacros(macros: ActionData['macros']): PantryItemMacr
   };
 }
 
-function sumMealTotals(meals: Meal[]): MacroTotals {
-  return meals.reduce<MacroTotals>(
-    (totals, meal) => {
-      const macros = normalizeMacros(meal.macros);
+function lowerSet(values: string[]): Set<string> {
+  return new Set(values.map((value) => String(value).toLowerCase()));
+}
 
-      return MACRO_KEYS.reduce<MacroTotals>(
-        (nextTotals, key) => ({
-          ...nextTotals,
-          [key]: nextTotals[key] + macros[key],
-        }),
-        totals,
-      );
-    },
-    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 },
+function mutationResult(
+  action: ParsedAction | null | undefined,
+  status: ActionMutationStatus,
+  value: unknown,
+  dateString?: string,
+): ActionMutationResult {
+  return {
+    action,
+    type: action?.type,
+    status,
+    changed: ['inserted', 'updated', 'deleted', 'replaced'].includes(status),
+    ...(dateString ? { dateString } : {}),
+    value,
+  };
+}
+
+function appliedResult<T>(
+  action: ParsedAction | null | undefined,
+  status: ActionMutationStatus,
+  value: T,
+  dateString?: string,
+): AppliedActionResult<T> {
+  return {
+    value,
+    mutation: mutationResult(action, status, value, dateString),
+  };
+}
+
+function returnAppliedResult<T>(
+  result: AppliedActionResult<T>,
+  options: ApplyActionOptions,
+): T | ActionMutationResult {
+  return options.returnMutationResult ? result.mutation : result.value;
+}
+
+function normalizedDescriptionKey(description: unknown): string {
+  return String(description ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function macroSignature(macros: unknown): string {
+  return JSON.stringify(normalizeMacros(macros as ActionData['macros']));
+}
+
+function isDuplicateMeal(existingMeal: Meal, nextMeal: Meal): boolean {
+  const existingTime = Date.parse(existingMeal.logged_at);
+  const nextTime = Date.parse(nextMeal.logged_at);
+
+  return (
+    normalizedDescriptionKey(existingMeal.description) === normalizedDescriptionKey(nextMeal.description) &&
+    macroSignature(existingMeal.macros) === macroSignature(nextMeal.macros) &&
+    Number.isFinite(existingTime) &&
+    Number.isFinite(nextTime) &&
+    Math.abs(existingTime - nextTime) <= DUPLICATE_MEAL_WINDOW_MS
   );
 }
 
-function lowerSet(values: string[]): Set<string> {
-  return new Set(values.map((value) => String(value).toLowerCase()));
+function removeDerivedAdherenceFlags(flags: string[] = []): string[] {
+  return flags.filter((flag) =>
+    !DERIVED_ADHERENCE_FLAG_PREFIXES.some((prefix) => flag.startsWith(prefix)),
+  );
+}
+
+function normalizeReplacementMeals(meals: unknown, now: Date): Meal[] {
+  if (!Array.isArray(meals)) {
+    return [];
+  }
+
+  const baseTimestamp = now.getTime();
+  return meals
+    .filter((meal): meal is { description?: unknown; macros?: ActionData['macros'] } =>
+      meal !== null && typeof meal === 'object',
+    )
+    .map((meal, index) => ({
+      id: `meal_${new Date(baseTimestamp + index).toISOString().replace(/[^0-9]/g, '')}_${index + 1}`,
+      logged_at: new Date(baseTimestamp + index).toISOString(),
+      description: String(meal.description ?? '').trim(),
+      macros: normalizeMacros(meal.macros),
+    }))
+    .filter((meal) => meal.description);
 }
 
 function applyLogMeal(
   action: ParsedAction,
   { dateString = todayString(), now = new Date() }: ApplyActionOptions = {},
-): DailyLog | null {
+): AppliedActionResult<DailyLog | null> {
   const description = String(action.data?.description ?? '').trim();
   if (!description) {
-    return null;
+    return appliedResult(action, 'noop', null);
   }
 
   const targetDateString = resolveActionDate(action.data?.date, dateString);
-  const log = getOrInitDailyLog(targetDateString);
+  const log = getOrInitCanonicalDailyLog(targetDateString);
   const meals = log.meals ?? [];
   const loggedAt = timestampFrom(now);
+  const nextMeal: Meal = {
+    id: `meal_${loggedAt.replace(/[^0-9]/g, '')}_${meals.length + 1}`,
+    logged_at: loggedAt,
+    description,
+    macros: normalizeMacros(action.data?.macros),
+  };
+
+  if (meals.some((meal) => isDuplicateMeal(meal, nextMeal))) {
+    return appliedResult(action, 'skipped_duplicate', log, targetDateString);
+  }
+
   const nextMeals: Meal[] = [
     ...meals,
-    {
-      id: `meal_${loggedAt.replace(/[^0-9]/g, '')}_${meals.length + 1}`,
-      logged_at: loggedAt,
-      description,
-      macros: normalizeMacros(action.data?.macros),
-    },
+    nextMeal,
   ];
   const nextLog: DailyLog = {
     ...log,
@@ -215,33 +316,137 @@ function applyLogMeal(
     totals: sumMealTotals(nextMeals),
   };
 
-  return setDailyLog(targetDateString, nextLog);
+  return appliedResult(action, 'inserted', setDailyLog(targetDateString, nextLog), targetDateString);
 }
 
-function applyLogWeight(action: ParsedAction): UserProfile | null {
+function applyLogWeight(action: ParsedAction): AppliedActionResult<UserProfile | null> {
   const weight = Number(action.data?.weight_lbs);
   const profile = getUserProfile();
   if (!profile || !Number.isFinite(weight)) {
-    return null;
+    return appliedResult(action, 'noop', null);
   }
 
-  return setUserProfile({
+  return appliedResult(action, 'updated', setUserProfile({
     ...profile,
     current_weight_lbs: weight,
-  });
+  }));
 }
 
 function applySetWorkoutDay(
   action: ParsedAction,
   { dateString = todayString() }: ApplyActionOptions = {},
-): DailyLog {
-  const log = getOrInitDailyLog(dateString);
+): AppliedActionResult<DailyLog> {
+  const targetDateString = resolveActionDate(action.data?.date, dateString);
+  const log = getOrInitCanonicalDailyLog(targetDateString);
+  const isWorkoutDay = Boolean(action.data?.is_workout_day);
+  if (log.is_workout_day === isWorkoutDay) {
+    return appliedResult(action, 'noop', log, targetDateString);
+  }
+
   const nextLog: DailyLog = {
     ...log,
-    is_workout_day: Boolean(action.data?.is_workout_day),
+    is_workout_day: isWorkoutDay,
   };
 
-  return setDailyLog(dateString, nextLog);
+  return appliedResult(action, 'updated', setDailyLog(targetDateString, nextLog), targetDateString);
+}
+
+function applyDeleteMeal(
+  action: ParsedAction,
+  { dateString = todayString() }: ApplyActionOptions = {},
+): AppliedActionResult<DailyLog | null> {
+  const mealId = String(action.data?.meal_id ?? '').trim();
+  if (!mealId) {
+    return appliedResult(action, 'noop', null);
+  }
+
+  const targetDateString = resolveActionDate(action.data?.date, dateString);
+  const log = getCanonicalDailyLog(targetDateString);
+  if (!log) {
+    return appliedResult(action, 'noop', null, targetDateString);
+  }
+
+  const nextMeals = log.meals.filter((meal) => meal.id !== mealId);
+  if (nextMeals.length === log.meals.length) {
+    return appliedResult(action, 'noop', log, targetDateString);
+  }
+
+  const nextLog: DailyLog = {
+    ...log,
+    meals: nextMeals,
+    totals: sumMealTotals(nextMeals),
+  };
+
+  return appliedResult(action, 'deleted', setDailyLog(targetDateString, nextLog), targetDateString);
+}
+
+function applyUpdateMeal(
+  action: ParsedAction,
+  { dateString = todayString() }: ApplyActionOptions = {},
+): AppliedActionResult<DailyLog | null> {
+  const mealId = String(action.data?.meal_id ?? '').trim();
+  if (!mealId) {
+    return appliedResult(action, 'noop', null);
+  }
+
+  const targetDateString = resolveActionDate(action.data?.date, dateString);
+  const log = getCanonicalDailyLog(targetDateString);
+  if (!log) {
+    return appliedResult(action, 'noop', null, targetDateString);
+  }
+
+  const mealIndex = log.meals.findIndex((meal) => meal.id === mealId);
+  if (mealIndex < 0) {
+    return appliedResult(action, 'noop', log, targetDateString);
+  }
+
+  const nextMeals = [...log.meals];
+  const currentMeal = nextMeals[mealIndex];
+  nextMeals[mealIndex] = {
+    ...currentMeal,
+    ...(action.data?.description !== undefined
+      ? { description: String(action.data.description).trim() }
+      : {}),
+    ...(action.data?.macros !== undefined
+      ? { macros: normalizeMacros(action.data.macros) }
+      : {}),
+  };
+
+  const nextLog: DailyLog = {
+    ...log,
+    meals: nextMeals,
+    totals: sumMealTotals(nextMeals),
+  };
+
+  return appliedResult(action, 'updated', setDailyLog(targetDateString, nextLog), targetDateString);
+}
+
+function applyReplaceDailyLog(
+  action: ParsedAction,
+  { dateString = todayString(), now = new Date() }: ApplyActionOptions = {},
+): AppliedActionResult<DailyLog | null> {
+  const targetDateString = resolveActionDate(action.data?.date, dateString);
+  const nextMeals = normalizeReplacementMeals(action.data?.meals, now);
+  if (nextMeals.length === 0) {
+    return appliedResult(action, 'noop', null, targetDateString);
+  }
+
+  const existingLog = getCanonicalDailyLog(targetDateString);
+  const fallbackLog = canonicalizeDailyLog({ date: targetDateString }, targetDateString);
+  const baseLog = existingLog ?? fallbackLog;
+  const nextLog: DailyLog = {
+    ...baseLog,
+    date: targetDateString,
+    is_workout_day: typeof action.data?.is_workout_day === 'boolean'
+      ? action.data.is_workout_day
+      : baseLog.is_workout_day,
+    weigh_in_lbs: baseLog.weigh_in_lbs,
+    meals: nextMeals,
+    totals: sumMealTotals(nextMeals),
+    adherence_flags: removeDerivedAdherenceFlags(baseLog.adherence_flags),
+  };
+
+  return appliedResult(action, 'replaced', setDailyLog(targetDateString, nextLog), targetDateString);
 }
 
 function applyUpdatePantry(
@@ -413,31 +618,49 @@ export function applyAction(
   action: ParsedAction | null | undefined,
   options: ApplyActionOptions = {},
 ): unknown {
+  if (!action) {
+    const result = appliedResult(action, 'noop', null);
+    return returnAppliedResult(result, options);
+  }
+
+  function returnRawMutation(value: unknown, status: ActionMutationStatus = value === null ? 'noop' : 'updated') {
+    return returnAppliedResult(
+      appliedResult(action, status, value),
+      options,
+    );
+  }
+
   switch (action?.type) {
     case 'log_meal':
-      return applyLogMeal(action, options);
+      return returnAppliedResult(applyLogMeal(action, options), options);
     case 'log_weight':
-      return applyLogWeight(action);
+      return returnAppliedResult(applyLogWeight(action), options);
     case 'set_workout_day':
-      return applySetWorkoutDay(action, options);
+      return returnAppliedResult(applySetWorkoutDay(action, options), options);
+    case 'delete_meal':
+      return returnAppliedResult(applyDeleteMeal(action, options), options);
+    case 'update_meal':
+      return returnAppliedResult(applyUpdateMeal(action, options), options);
+    case 'replace_daily_log':
+      return returnAppliedResult(applyReplaceDailyLog(action, options), options);
     case 'update_pantry':
-      return applyUpdatePantry(action, options);
+      return returnRawMutation(applyUpdatePantry(action, options));
     case 'update_pantry_macros':
-      return applyUpdatePantryMacros(action, options);
+      return returnRawMutation(applyUpdatePantryMacros(action, options));
     case 'update_rule':
-      return applyUpdateRule(action);
+      return returnRawMutation(applyUpdateRule(action));
     case 'update_macros':
-      return applyUpdateMacros(action);
+      return returnRawMutation(applyUpdateMacros(action));
     case 'save_memory':
-      return applySaveMemory(action);
+      return returnRawMutation(applySaveMemory(action));
     case 'forget_memory':
-      return applyForgetMemory(action);
+      return returnRawMutation(applyForgetMemory(action));
     case 'play_animation':
-      return null;
+      return returnRawMutation(null, 'noop');
     case 'onboarding_complete':
-      return null;
+      return returnRawMutation(null, 'noop');
     default:
-      return null;
+      return returnRawMutation(null, 'noop');
   }
 }
 

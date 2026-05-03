@@ -89,6 +89,17 @@ test('home screen processes chat photos sequentially and enforces the client req
   assert.match(source, /assertChatRequestWithinImageBudget\(requestBody\)/);
 });
 
+test('home screen uses action mutation metadata for vitals and filters skipped duplicate animations', () => {
+  assert.match(source, /returnMutationResult:\s*true/);
+  assert.match(source, /mutationResults/);
+  assert.match(source, /applyActionsVitalEffects\(actions,\s*\{/);
+  assert.match(source, /mutationResults,/);
+  assert.match(source, /animationActions/);
+  assert.match(source, /action\.type === 'play_animation'/);
+  assert.match(source, /mutationResults\[index\]\?\.changed/);
+  assert.match(source, /actions:\s*animationActions/);
+});
+
 test('home screen gives clearer photo upload failures without logging raw image data', () => {
   assert.match(source, /logHomeChatError\(error,\s*imageFiles,\s*processedImages\)/);
   assert.match(source, /imageUploadUserMessage\(error\)/);

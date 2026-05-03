@@ -16,6 +16,7 @@ import {
   applyActions,
   parseActions,
   stripActionEnvelopes,
+  type ActionMutationResult,
 } from '../lib/actions.ts';
 import {
   actionsToReactiveAnimations,
@@ -65,6 +66,7 @@ import {
   clearAll,
   getBubbyColorId,
   getBubbyState,
+  getCanonicalDailyLog,
   getConversationHistory,
   getDailyLog,
   getUserProfile,
@@ -636,20 +638,26 @@ function HomeScreen({
       const visibleReply = stripActionEnvelopes(body.reply ?? '');
       const actions = parseActions(body.reply ?? '');
       const dateString = todayString();
-      const beforeDailyLog = getDailyLog(dateString);
+      const beforeDailyLog = getCanonicalDailyLog(dateString);
       const beforeProfile = getUserProfile();
-      applyActions(actions);
+      const mutationResults = applyActions(actions, {
+        returnMutationResult: true,
+      }) as ActionMutationResult[];
+      const animationActions = actions.filter((action, index) =>
+        action.type === 'play_animation' || mutationResults[index]?.changed,
+      );
       applyActionsVitalEffects(actions, {
         dateString,
         beforeDailyLog,
         userProfile: beforeProfile,
+        mutationResults,
       });
       setVitalBarsRefreshKey((currentKey) => currentKey + 1);
       const reactiveAnimations = actionsToReactiveAnimations({
-        actions,
+        actions: animationActions,
         userProfile: getUserProfile() ?? beforeProfile,
         beforeDailyLog,
-        afterDailyLog: getDailyLog(dateString),
+        afterDailyLog: getCanonicalDailyLog(dateString),
       });
 
       if (reactiveAnimations.length > 0) {

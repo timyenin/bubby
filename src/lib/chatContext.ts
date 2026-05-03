@@ -1,4 +1,4 @@
-import { formatDate, todayString } from './dates.ts';
+import { dateStringForOffset, formatDate, todayString, yesterdayString } from './dates.ts';
 import {
   calculateWeightLossRate,
   isUnderCalorieFloor,
@@ -7,11 +7,15 @@ import {
 import { buildCurrentTimeContext } from './timeContext.ts';
 import {
   getBubbyState,
+  canonicalizeDailyLog,
   getConversationHistory,
-  getDailyLog,
+  getCanonicalDailyLog,
+  getOrInitCanonicalDailyLog,
   getMemory,
   getPantry,
   getUserProfile,
+  normalizeMacroTotals,
+  repairDailyLogs,
   type BubbyState,
   type ConversationHistory,
   type DailyLog,
@@ -35,10 +39,39 @@ export interface CompactHistoryMessage {
   content: string;
 }
 
+export interface DailyLogMealContext {
+  id: string;
+  description: string;
+  logged_at: string;
+  macros: MacroTotals;
+}
+
+export interface DailyLogContext {
+  date: string;
+  is_workout_day: boolean;
+  meals: DailyLogMealContext[];
+  totals: MacroTotals;
+  target: MacroTargets | null;
+  remaining: Partial<MacroTotals>;
+  deltas: Partial<MacroTotals>;
+}
+
+export interface RecentDailySummary {
+  date: string;
+  is_workout_day: boolean;
+  meal_count: number;
+  totals: MacroTotals;
+}
+
 export interface ChatContext {
+  today_date: string;
+  yesterday_date: string;
   user_profile: UserProfile | null;
   macros_today: Partial<MacroTotals>;
   macros_remaining: Partial<MacroTotals>;
+  daily_log_today: DailyLogContext | null;
+  daily_log_yesterday: DailyLogContext | null;
+  recent_daily_summaries: RecentDailySummary[];
   training_today: string | null;
   pantry: Pantry | null;
   recent_history: CompactHistoryMessage[];
@@ -89,17 +122,25 @@ function getTargetForDay(
   return dailyLog?.is_workout_day ? targets.workout_day : targets.rest_day;
 }
 
+function roundContextMacroValue(key: keyof MacroTotals, value: unknown): number {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  if (key === 'calories') {
+    return Math.round(numericValue);
+  }
+
+  return Math.round(numericValue * 10) / 10;
+}
+
 function getWeekdayKeys(now: Date): Array<string | number> {
   const weekdayIndex = now.getDay();
   const fullName = WEEKDAYS[weekdayIndex];
   const shortName = SHORT_WEEKDAYS[weekdayIndex];
 
   return [fullName, fullName[0].toUpperCase() + fullName.slice(1), shortName, weekdayIndex];
-}
-
-function offsetDateString(dateString: string, dayOffset: number): string {
-  const [year, month, day] = dateString.split('-').map(Number);
-  return formatDate(new Date(year, month - 1, day + dayOffset));
 }
 
 function hasLoggedMeal(dailyLog: DailyLog | null | undefined): boolean {
@@ -119,9 +160,25 @@ function loggedBelowFloor(
 
 function collectRecentDailyLogs(dateString: string, dayCount: number): Array<DailyLog | null> {
   return Array.from({ length: dayCount }, (_, index) => {
-    const logDate = offsetDateString(dateString, index - dayCount + 1);
-    return getDailyLog(logDate);
+    const logDate = dateStringForOffset(new Date(`${dateString}T12:00:00`), index - dayCount + 1);
+    return getCanonicalDailyLog(logDate);
   });
+}
+
+function normalizeMemoryEntries(memory: MemoryEntry[] | null | undefined): MemoryEntry[] | null {
+  if (!Array.isArray(memory)) {
+    return null;
+  }
+
+  const entries = memory.filter((entry): entry is MemoryEntry => (
+    entry !== null &&
+    typeof entry === 'object' &&
+    typeof entry.content === 'string' &&
+    entry.content.trim() !== '' &&
+    typeof entry.category === 'string'
+  ));
+
+  return entries.length > 0 ? entries : null;
 }
 
 export function resolveConcernLevel(
@@ -169,9 +226,68 @@ export function calculateMacrosRemaining(
     const totalValue = Number(totals?.[key] ?? 0);
     return {
       ...remaining,
-      [key]: Math.max(0, targetValue - totalValue),
+      [key]: Math.max(0, roundContextMacroValue(key, targetValue - totalValue)),
     };
   }, {});
+}
+
+export function calculateMacroDeltas(
+  target: MacroTargets | null | undefined,
+  totals: Partial<MacroTotals> = {},
+): Partial<MacroTotals> {
+  if (!target) {
+    return {};
+  }
+
+  return MACRO_KEYS.reduce<Partial<MacroTotals>>((deltas, key) => {
+    const targetValue = Number(target[key] ?? 0);
+    const totalValue = Number(totals?.[key] ?? 0);
+    return {
+      ...deltas,
+      [key]: roundContextMacroValue(key, targetValue - totalValue),
+    };
+  }, {});
+}
+
+function dailyLogToContext(
+  dailyLog: DailyLog | null | undefined,
+  userProfile: UserProfile | null | undefined,
+): DailyLogContext | null {
+  if (!dailyLog) {
+    return null;
+  }
+
+  const canonicalLog = canonicalizeDailyLog(dailyLog, dailyLog.date);
+  const totals = normalizeMacroTotals(canonicalLog.totals);
+  const target = getTargetForDay(userProfile, canonicalLog);
+
+  return {
+    date: canonicalLog.date,
+    is_workout_day: canonicalLog.is_workout_day,
+    meals: (canonicalLog.meals ?? []).map((meal) => ({
+      id: meal.id,
+      description: meal.description,
+      logged_at: meal.logged_at,
+      macros: normalizeMacroTotals(meal.macros),
+    })),
+    totals,
+    target,
+    remaining: calculateMacrosRemaining(target, totals),
+    deltas: calculateMacroDeltas(target, totals),
+  };
+}
+
+function dailyLogSummary(dailyLog: DailyLog | null): RecentDailySummary | null {
+  if (!dailyLog) {
+    return null;
+  }
+
+  return {
+    date: dailyLog.date,
+    is_workout_day: dailyLog.is_workout_day,
+    meal_count: dailyLog.meals.length,
+    totals: normalizeMacroTotals(dailyLog.totals),
+  };
 }
 
 export function resolveTrainingToday(
@@ -196,40 +312,57 @@ export function resolveTrainingToday(
 export interface BuildChatContextOptions {
   userProfile?: UserProfile | null;
   dailyLog?: DailyLog | null;
+  yesterdayLog?: DailyLog | null;
   recentDailyLogs?: Array<DailyLog | null>;
   pantry?: Pantry | null;
   memory?: MemoryEntry[] | null;
   conversationHistory?: ConversationHistory | null;
   bubbyState?: BubbyState | null;
   now?: Date;
+  dateString?: string;
+  yesterdayDateString?: string;
   currentTime?: string;
 }
 
 export function buildChatContext({
   userProfile = null,
   dailyLog = null,
+  yesterdayLog = null,
   recentDailyLogs = [],
   pantry = null,
   memory = null,
   conversationHistory = null,
   bubbyState = null,
   now = new Date(),
+  dateString = dailyLog?.date ?? formatDate(now),
+  yesterdayDateString = yesterdayLog?.date ?? yesterdayString(now),
   currentTime = buildCurrentTimeContext(now),
 }: BuildChatContextOptions = {}): ChatContext {
-  const macrosToday = dailyLog?.totals ?? {};
-  const target = getTargetForDay(userProfile, dailyLog);
+  const canonicalDailyLog = dailyLog ? canonicalizeDailyLog(dailyLog, dateString) : null;
+  const macrosToday = canonicalDailyLog?.totals ? normalizeMacroTotals(canonicalDailyLog.totals) : {};
+  const target = getTargetForDay(userProfile, canonicalDailyLog);
+  const dailyLogToday = dailyLogToContext(canonicalDailyLog, userProfile);
+  const dailyLogYesterday = dailyLogToContext(yesterdayLog, userProfile);
 
   return {
+    today_date: dateString,
+    yesterday_date: yesterdayDateString,
     user_profile: userProfile,
     macros_today: macrosToday,
     macros_remaining: calculateMacrosRemaining(target, macrosToday),
+    daily_log_today: dailyLogToday,
+    daily_log_yesterday: dailyLogYesterday,
+    recent_daily_summaries: recentDailyLogs
+      .slice(-7)
+      .map(dailyLogSummary)
+      .filter((summary): summary is RecentDailySummary => summary !== null),
     training_today: resolveTrainingToday(userProfile, now),
     pantry,
     recent_history: compactHistory(conversationHistory),
     bubby_state: bubbyState ?? defaultBubbyState(currentTime),
     concern_level: resolveConcernLevel(userProfile, recentDailyLogs),
     weight_loss_rate: resolveWeightLossRateSignal(recentDailyLogs),
-    memory,
+    memory: normalizeMemoryEntries(memory),
     current_time: currentTime,
     is_onboarding: false,
   };
@@ -240,17 +373,23 @@ export function buildChatContextFromStorage({
   dateString = todayString(),
   currentTime = buildCurrentTimeContext(now),
 }: { now?: Date; dateString?: string; currentTime?: string } = {}): ChatContext {
+  repairDailyLogs(dateString, 7);
   const recentDailyLogs = collectRecentDailyLogs(dateString, 14);
+  const currentDate = new Date(`${dateString}T12:00:00`);
+  const previousDateString = dateStringForOffset(currentDate, -1);
 
   return buildChatContext({
     userProfile: getUserProfile(),
-    dailyLog: getDailyLog(dateString),
+    dailyLog: getOrInitCanonicalDailyLog(dateString),
+    yesterdayLog: getCanonicalDailyLog(previousDateString),
     recentDailyLogs,
     pantry: getPantry(),
     memory: getMemory()?.entries ?? null,
     conversationHistory: getConversationHistory(),
     bubbyState: getBubbyState(),
     now,
+    dateString,
+    yesterdayDateString: previousDateString,
     currentTime,
   });
 }
