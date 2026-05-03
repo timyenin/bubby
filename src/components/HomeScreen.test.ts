@@ -82,3 +82,19 @@ test('home screen extends the hamburger menu with release info controls', () => 
   assert.match(source, /window\.confirm/);
   assert.match(source, /window\.location\.reload/);
 });
+
+test('home screen processes chat photos sequentially and enforces the client request budget', () => {
+  assert.match(source, /processImagesForChatUpload/);
+  assert.doesNotMatch(source, /Promise\.all\(\s*imageFiles\.map/);
+  assert.match(source, /assertChatRequestWithinImageBudget\(requestBody\)/);
+});
+
+test('home screen gives clearer photo upload failures without logging raw image data', () => {
+  assert.match(source, /logHomeChatError\(error,\s*imageFiles,\s*processedImages\)/);
+  assert.match(source, /imageUploadUserMessage\(error\)/);
+  assert.match(source, /response\.status === 413/);
+  assert.match(source, /name:\s*file\.name/);
+  assert.match(source, /size:\s*file\.size/);
+  assert.match(source, /fullImageBytes:/);
+  assert.doesNotMatch(source, /console\.error\([^)]*fullImage/);
+});

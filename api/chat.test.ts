@@ -1,5 +1,6 @@
 // @ts-nocheck
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import defaultChatHandler, { buildUserContent, createVercelChatHandler } from './chat.ts';
@@ -195,4 +196,58 @@ test('vercel buildUserContent formats multiple images before one text block', ()
       { type: 'text', text: 'these are lunch' },
     ],
   );
+});
+
+test('vercel chat handler returns 413 for request bodies above the serverless limit', async () => {
+  const handler = createVercelChatHandler({
+    claudeClient: {
+      createMessage: async () => {
+        throw new Error('should not be called');
+      },
+    },
+    prompts: { basePrompt: '', onboardingPrompt: '' },
+  });
+  const response = createMockResponse();
+  const request = {
+    method: 'POST',
+    async *[Symbol.asyncIterator]() {
+      yield Buffer.alloc(5 * 1024 * 1024);
+    },
+  };
+
+  await handler(request, response);
+
+  assert.equal(response.statusCode, 413);
+  assert.deepEqual(response.json(), { error: 'request body is too large' });
+});
+
+test('vercel chat handler rejects malformed image payloads without calling Claude', async () => {
+  const handler = createVercelChatHandler({
+    claudeClient: {
+      createMessage: async () => {
+        throw new Error('should not be called');
+      },
+    },
+    prompts: { basePrompt: '', onboardingPrompt: '' },
+  });
+  const response = createMockResponse();
+
+  await handler(
+    {
+      method: 'POST',
+      body: {
+        message: '',
+        images: [{ data: 123, media_type: 'image/jpeg' }],
+      },
+    },
+    response,
+  );
+
+  assert.equal(response.statusCode, 400);
+  assert.deepEqual(response.json(), { error: 'valid image is required' });
+});
+
+test('chat API keeps the Claude Sonnet 4.6 model string', () => {
+  assert.match(readFileSync(new URL('./chat.ts', import.meta.url), 'utf8'), /const MODEL = 'claude-sonnet-4-6'/);
+  assert.match(readFileSync(new URL('../server/claude.ts', import.meta.url), 'utf8'), /const MODEL = 'claude-sonnet-4-6'/);
 });

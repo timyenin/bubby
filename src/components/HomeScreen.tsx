@@ -40,7 +40,14 @@ import {
   DIALOGUE_CHARACTER_DELAY_MS,
   getDialogueRolloutDelay,
 } from '../lib/dialogueRollout.ts';
-import { processImageForUpload } from '../lib/imageProcessing.ts';
+import {
+  assertChatRequestWithinImageBudget,
+  estimateDataUrlBytes,
+  ImageProcessingError,
+  imageUploadUserMessage,
+  processImagesForChatUpload,
+  type ProcessedImage,
+} from '../lib/imageProcessing.ts';
 import {
   getActiveMusicOption,
   MUSIC_OPTIONS,
@@ -129,6 +136,58 @@ function createMessage(
     timestamp,
     ...extras,
   };
+}
+
+function imageFileForLog(file: File) {
+  return {
+    name: file.name,
+    type: file.type,
+    size: file.size,
+  };
+}
+
+function processedImageForLog(processedImage: ProcessedImage) {
+  return {
+    mediaType: processedImage.mediaType,
+    fullImageBytes: estimateDataUrlBytes(processedImage.fullImage),
+    thumbnailBytes: estimateDataUrlBytes(processedImage.thumbnail),
+  };
+}
+
+function errorForLog(error: unknown) {
+  if (error instanceof ImageProcessingError) {
+    return {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      details: error.details,
+    };
+  }
+
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+    };
+  }
+
+  return {
+    name: typeof error,
+    message: String(error),
+  };
+}
+
+function logHomeChatError(
+  error: unknown,
+  imageFiles: File[],
+  processedImages: ProcessedImage[],
+) {
+  console.error('Home chat request failed', {
+    error: errorForLog(error),
+    imageCount: imageFiles.length,
+    imageFiles: imageFiles.map((file) => imageFileForLog(file)),
+    processedImages: processedImages.map((processedImage) => processedImageForLog(processedImage)),
+  });
 }
 
 function homeVisibleMessages(
@@ -517,12 +576,22 @@ function HomeScreen({
 
     setInputValue('');
     setIsSending(true);
+    let processedImages: ProcessedImage[] = [];
 
     try {
-      const processedImages = await Promise.all(
-        imageFiles.map((imageFile) => processImageForUpload(imageFile)),
-      );
+      processedImages = await processImagesForChatUpload(imageFiles);
       const context = buildChatContextFromStorage();
+      const requestBody = {
+        message: content,
+        image: null,
+        images: processedImages.map((processedImage) => ({
+          data: dataUrlToBase64(processedImage.fullImage),
+          media_type: processedImage.mediaType,
+        })),
+        context,
+        is_onboarding: false,
+      };
+      assertChatRequestWithinImageBudget(requestBody);
       const userHistory = appendMessageToHistory(
         createMessage(
           'user',
@@ -542,25 +611,30 @@ function HomeScreen({
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          message: content,
-          image: null,
-          images: processedImages.map((processedImage) => ({
-            data: dataUrlToBase64(processedImage.fullImage),
-            media_type: processedImage.mediaType,
-          })),
-          context,
-          is_onboarding: false,
-        }),
+        body: JSON.stringify(requestBody),
       });
-      const body = await response.json();
+      let body: { error?: string; reply?: string; raw_usage?: unknown } = {};
+
+      try {
+        body = await response.json();
+      } catch {
+        body = {};
+      }
 
       if (!response.ok) {
+        if (response.status === 413) {
+          throw new ImageProcessingError(
+            'request-payload-too-large',
+            body.error ?? 'request body is too large',
+            { status: response.status },
+          );
+        }
+
         throw new Error(body.error ?? 'chat request failed');
       }
 
-      const visibleReply = stripActionEnvelopes(body.reply);
-      const actions = parseActions(body.reply);
+      const visibleReply = stripActionEnvelopes(body.reply ?? '');
+      const actions = parseActions(body.reply ?? '');
       const dateString = todayString();
       const beforeDailyLog = getDailyLog(dateString);
       const beforeProfile = getUserProfile();
@@ -601,12 +675,12 @@ function HomeScreen({
         setAttachmentClearSignal((currentSignal) => currentSignal + 1);
       }
     } catch (error) {
-      console.error('Home chat request failed', error);
+      logHomeChatError(error, imageFiles, processedImages);
       clearRolloutInterval();
       setHomeRollingMessageId(null);
       setHomeRevealedLength(0);
       const errorHistory = appendMessageToHistory(
-        createMessage('assistant', 'something glitched. try again?'),
+        createMessage('assistant', imageUploadUserMessage(error)),
       );
       setHomeMessages(homeVisibleMessages(errorHistory));
     } finally {
