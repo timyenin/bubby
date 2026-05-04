@@ -834,8 +834,12 @@ button {
   flex: 0 0 auto;
   border: 0;
   background: transparent;
+  cursor: pointer;
   touch-action: manipulation;
+  user-select: none;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
   padding: 0;
 }
 

@@ -32,9 +32,31 @@ test('thumbnail clicks open the matching selected image in the lightbox', () => 
     /function openLightboxForImage\(message: DisplayMessage, thumbnail: string, index: number\) \{/,
   );
   assert.match(source, /setLightboxImage\(fullImageFor\(message, thumbnail, index\)\)/);
-  assert.match(source, /onClick=\{\(\) => openLightboxForImage\(message, thumbnail, imageIndex\)\}/);
-  assert.match(source, /imageSrc=\{lightboxImage\}/);
-  assert.match(source, /onClose=\{\(\) => setLightboxImage\(null\)\}/);
+  assert.match(source, /function handleThumbnailClick\(/);
+  assert.match(source, /onClick=\{\(event\) => handleThumbnailClick\(event, message, thumbnail, imageIndex, imageOpenKey\)\}/);
+  assert.match(source, /renderImageLightbox\(lightboxImage, \(\) => setLightboxImage\(null\)\)/);
+});
+
+test('image lightbox renders through document body portal when available', () => {
+  assert.match(source, /import \{ createPortal \} from 'react-dom';/);
+  assert.match(source, /function renderImageLightbox\(/);
+  assert.match(source, /typeof document === 'undefined' \|\| !document\.body/);
+  assert.match(source, /return createPortal\(lightbox, document\.body\)/);
+});
+
+test('thumbnail touchend opens the same image with duplicate click suppression', () => {
+  assert.match(source, /const RECENT_TOUCH_OPEN_WINDOW_MS = \d+;/);
+  assert.match(source, /const TAP_MOVE_TOLERANCE_PX = \d+;/);
+  assert.match(source, /const lastTouchOpenRef = useRef/);
+  assert.match(source, /const thumbnailTouchStartRef = useRef/);
+  assert.match(source, /function handleThumbnailTouchStart\(/);
+  assert.match(source, /function handleThumbnailTouchEnd\(/);
+  assert.match(source, /event\.preventDefault\(\)/);
+  assert.match(source, /lastTouchOpenRef\.current = \{ key: imageOpenKey, timestamp: Date\.now\(\) \}/);
+  assert.match(source, /Date\.now\(\) - lastTouchOpen\.timestamp < RECENT_TOUCH_OPEN_WINDOW_MS/);
+  assert.match(source, /onTouchStart=\{\(event\) => handleThumbnailTouchStart\(event, imageOpenKey\)\}/);
+  assert.match(source, /onTouchEnd=\{\(event\) => handleThumbnailTouchEnd\(event, message, thumbnail, imageIndex, imageOpenKey\)\}/);
+  assert.match(source, /onTouchCancel=\{\(\) => \{/);
 });
 
 test('thumbnail buttons scope native context menu prevention to image previews', () => {
@@ -57,4 +79,13 @@ test('thumbnail image is presentational and not the interactive target', () => {
   assert.match(source, /<button[\s\S]*className="message-thumbnail-button"[\s\S]*<img[\s\S]*className="message-thumbnail"/);
   assert.match(source, /alt=""/);
   assert.match(source, /draggable=\{false\}/);
+});
+
+test('lightbox keeps close, backdrop, and inside-frame click behavior', () => {
+  assert.match(source, /role="dialog"/);
+  assert.match(source, /aria-modal="true"/);
+  assert.match(source, /aria-label="image preview"/);
+  assert.match(source, /className="image-lightbox"[\s\S]*onClick=\{onClose\}/);
+  assert.match(source, /className="image-lightbox-close"[\s\S]*type="button"[\s\S]*onClick=\{onClose\}/);
+  assert.match(source, /className="image-lightbox-frame" onClick=\{\(event\) => event\.stopPropagation\(\)\}/);
 });
