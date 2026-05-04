@@ -834,6 +834,8 @@ button {
   flex: 0 0 auto;
   border: 0;
   background: transparent;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   padding: 0;
 }
 
@@ -844,6 +846,10 @@ button {
   max-height: 80px;
   border-radius: 10px;
   object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .image-lightbox {

@@ -99,6 +99,10 @@ function ChatMessages({
     return () => window.cancelAnimationFrame(frameId);
   }, [visibleMessages, revealedLength]);
 
+  function openLightboxForImage(message: DisplayMessage, thumbnail: string, index: number) {
+    setLightboxImage(fullImageFor(message, thumbnail, index));
+  }
+
   return (
     <section className="messages-zone" aria-label="conversation history" ref={messagesRef}>
       {visibleMessages.map((message, index) => {
@@ -126,12 +130,15 @@ function ChatMessages({
                       className="message-thumbnail-button"
                       key={`${thumbnail}-${imageIndex}`}
                       type="button"
-                      onClick={() => setLightboxImage(fullImageFor(message, thumbnail, imageIndex))}
+                      aria-label="open image"
+                      onClick={() => openLightboxForImage(message, thumbnail, imageIndex)}
+                      onContextMenu={(event) => event.preventDefault()}
                     >
                       <img
                         className="message-thumbnail"
                         src={thumbnail}
                         alt=""
+                        draggable={false}
                         loading="lazy"
                       />
                       <span className="sr-only">open image</span>

@@ -99,6 +99,21 @@ test('messages zone leaves bottom breathing room for newest messages', () => {
   assert.match(messagesRule, /scroll-padding-bottom:\s*18px/);
 });
 
+test('sent image thumbnails are hardened for mobile tap and callout behavior', () => {
+  const thumbnailButtonRule = ruleFor('.message-thumbnail-button');
+  const thumbnailRule = ruleFor('.message-thumbnail');
+  const globalImageRule = ruleFor('img');
+
+  assert.match(thumbnailButtonRule, /touch-action:\s*manipulation/);
+  assert.match(thumbnailButtonRule, /-webkit-tap-highlight-color:\s*transparent/);
+  assert.match(thumbnailRule, /pointer-events:\s*none/);
+  assert.match(thumbnailRule, /user-select:\s*none/);
+  assert.match(thumbnailRule, /-webkit-user-select:\s*none/);
+  assert.match(thumbnailRule, /-webkit-touch-callout:\s*none/);
+  assert.doesNotMatch(globalImageRule, /pointer-events:\s*none/);
+  assert.doesNotMatch(globalImageRule, /-webkit-touch-callout:\s*none/);
+});
+
 test('chat input sizing avoids clipping while scoping iOS anti-zoom separately', () => {
   const chatBarRule = ruleFor('.chat-bar');
   const inputShellRule = ruleFor('.chat-input-shell');
