@@ -21,6 +21,7 @@ interface ChatBarProps {
   onSubmit?: () => void;
   onAttachmentChange?: (files: File[]) => void;
   attachmentClearSignal?: number;
+  attachmentFiles?: File[];
   disabled?: boolean;
   isSending?: boolean;
   placeholder?: string;
@@ -32,6 +33,7 @@ function ChatBar({
   onSubmit,
   onAttachmentChange,
   attachmentClearSignal,
+  attachmentFiles,
   disabled = true,
   isSending = false,
   placeholder = 'Type a message...',
@@ -46,6 +48,20 @@ function ChatBar({
     previews.forEach((preview) => URL.revokeObjectURL(preview.url));
   }
 
+  function createAttachmentPreview(file: File): AttachmentPreview {
+    return {
+      file,
+      url: URL.createObjectURL(file),
+      name: file.name || 'selected image',
+    };
+  }
+
+  function resetFileInput() {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }
+
   useEffect(() => {
     if (attachmentClearSignal === undefined) {
       return;
@@ -56,10 +72,30 @@ function ChatBar({
       return [];
     });
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    resetFileInput();
   }, [attachmentClearSignal]);
+
+  useEffect(() => {
+    if (attachmentFiles === undefined) {
+      return;
+    }
+
+    const nextFiles = attachmentFiles.slice(0, MAX_ATTACHMENTS);
+    setAttachmentPreviews((currentPreviews) => {
+      const currentFiles = currentPreviews.map((preview) => preview.file);
+      const isSameSelection =
+        currentFiles.length === nextFiles.length &&
+        currentFiles.every((file, index) => file === nextFiles[index]);
+
+      if (isSameSelection) {
+        return currentPreviews;
+      }
+
+      revokePreviews(currentPreviews);
+      return nextFiles.map(createAttachmentPreview);
+    });
+    resetFileInput();
+  }, [attachmentFiles]);
 
   useEffect(
     () => () => {
@@ -88,21 +124,17 @@ function ChatBar({
     }
   }
 
-  function updateAttachmentPreviews(files: File[]) {
+  function updateAttachmentPreviews(nextFiles: File[]) {
+    const cappedFiles = nextFiles.slice(0, MAX_ATTACHMENTS);
+
     setAttachmentPreviews((currentPreviews) => {
       revokePreviews(currentPreviews);
 
-      return files.map((file) => ({
-        file,
-        url: URL.createObjectURL(file),
-        name: file.name || 'selected image',
-      }));
+      return cappedFiles.map(createAttachmentPreview);
     });
-    onAttachmentChange?.(files);
+    onAttachmentChange?.(cappedFiles);
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    resetFileInput();
   }
 
   function removeAttachment(indexToRemove: number) {
@@ -113,12 +145,15 @@ function ChatBar({
   }
 
   function handleAttachmentChange(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []).slice(0, MAX_ATTACHMENTS);
-    if (files.length === 0) {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    if (selectedFiles.length === 0) {
+      resetFileInput();
       return;
     }
 
-    updateAttachmentPreviews(files);
+    const existingFiles = attachmentPreviews.map((preview) => preview.file);
+    const nextFiles = [...existingFiles, ...selectedFiles].slice(0, MAX_ATTACHMENTS);
+    updateAttachmentPreviews(nextFiles);
   }
 
   return (

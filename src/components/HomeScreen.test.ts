@@ -116,14 +116,33 @@ test('home screen sends full processed images to Claude but stores only thumbnai
   assert.doesNotMatch(source, /fullImages:\s*processedImages\.map/);
 });
 
-test('home screen keeps attachments on failed sends and clears them only after success', () => {
-  const successClearIndex = source.indexOf('if (processedImages.length > 0)');
-  const catchIndex = source.indexOf('} catch (error) {', successClearIndex);
+test('home screen clears composer attachments before processing captured send files', () => {
+  const sendStart = source.indexOf('async function sendHomeMessage()');
+  const imageFilesIndex = source.indexOf('const imageFiles = attachedImageFiles.slice(0, 4);', sendStart);
+  const clearIndex = source.indexOf('setAttachedImageFiles([])', sendStart);
+  const clearSignalIndex = source.indexOf('setAttachmentClearSignal((currentSignal) => currentSignal + 1)', sendStart);
+  const processIndex = source.indexOf('processImagesForChatUpload(imageFiles)', sendStart);
+
+  assert.ok(sendStart >= 0);
+  assert.ok(imageFilesIndex > sendStart);
+  assert.ok(clearIndex > imageFilesIndex);
+  assert.ok(clearSignalIndex > clearIndex);
+  assert.ok(processIndex > clearSignalIndex);
+});
+
+test('home screen restores captured attachments only for failures before the request starts', () => {
+  const sendStart = source.indexOf('async function sendHomeMessage()');
+  const requestFlagIndex = source.indexOf('let requestStarted = false;', sendStart);
+  const requestStartedIndex = source.indexOf('requestStarted = true;', requestFlagIndex);
+  const fetchIndex = source.indexOf("await fetch('/api/chat'", requestStartedIndex);
+  const catchIndex = source.indexOf('} catch (error) {', fetchIndex);
   const catchBlock = source.slice(catchIndex, source.indexOf('} finally {', catchIndex));
 
-  assert.ok(successClearIndex >= 0);
-  assert.match(source.slice(successClearIndex, catchIndex), /setAttachedImageFiles\(\[\]\)/);
-  assert.doesNotMatch(catchBlock, /setAttachedImageFiles\(\[\]\)/);
+  assert.ok(requestFlagIndex > sendStart);
+  assert.ok(requestStartedIndex > requestFlagIndex);
+  assert.ok(fetchIndex > requestStartedIndex);
+  assert.match(catchBlock, /if \(!requestStarted && imageFiles\.length > 0\) \{/);
+  assert.match(catchBlock, /setAttachedImageFiles\(imageFiles\)/);
   assert.doesNotMatch(catchBlock, /setAttachmentClearSignal/);
 });
 

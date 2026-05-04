@@ -106,6 +106,7 @@ interface ChatBarPropsShape {
   onSubmit?: () => void;
   onAttachmentChange?: (files: File[]) => void;
   attachmentClearSignal?: number;
+  attachmentFiles?: File[];
   disabled?: boolean;
   isSending?: boolean;
   placeholder?: string;
@@ -616,8 +617,13 @@ function HomeScreen({
     }
 
     setInputValue('');
+    if (imageFiles.length > 0) {
+      setAttachedImageFiles([]);
+      setAttachmentClearSignal((currentSignal) => currentSignal + 1);
+    }
     setIsSending(true);
     let processedImages: ProcessedImage[] = [];
+    let requestStarted = false;
 
     try {
       processedImages = await processImagesForChatUpload(imageFiles);
@@ -653,6 +659,7 @@ function HomeScreen({
         );
       }
 
+      requestStarted = true;
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -723,12 +730,11 @@ function HomeScreen({
         }
         await startReplyRollout(assistantMessage.id ?? assistantMessage.timestamp, visibleReply);
       }
-
-      if (processedImages.length > 0) {
-        setAttachedImageFiles([]);
-        setAttachmentClearSignal((currentSignal) => currentSignal + 1);
-      }
     } catch (error) {
+      if (!requestStarted && imageFiles.length > 0) {
+        setAttachedImageFiles(imageFiles);
+      }
+
       logHomeChatError(error, imageFiles, processedImages);
       clearRolloutInterval();
       setHomeRollingMessageId(null);
@@ -778,6 +784,7 @@ function HomeScreen({
         onSubmit: sendHomeMessage,
         onAttachmentChange: setAttachedImageFiles,
         attachmentClearSignal,
+        attachmentFiles: attachedImageFiles,
         disabled: isSending,
         isSending,
       };
