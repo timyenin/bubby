@@ -313,6 +313,8 @@ function HomeScreen({
   const rolloutIntervalRef = useRef<number | null>(null);
   const idleSpinTimeoutRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const activeMusicOptionRef = useRef<MusicOption>(activeMusicOption);
+  const currentMusicSourceRef = useRef<string | null>(null);
   const musicRequestIdRef = useRef(0);
   const themeButtonRef = useRef<HTMLButtonElement | null>(null);
   const themePickerRef = useRef<HTMLDivElement | null>(null);
@@ -338,10 +340,20 @@ function HomeScreen({
       audio.pause();
       audio.currentTime = 0;
     }
+    currentMusicSourceRef.current = null;
     setIsMusicPlaying(false);
   }
 
-  async function startMusicPlayback(option: MusicOption) {
+  function pauseMusicForBackground() {
+    musicRequestIdRef.current += 1;
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+    }
+    setIsMusicPlaying(false);
+  }
+
+  async function startMusicPlayback(option: MusicOption, restartFromBeginning = true) {
     if (!option.src) {
       stopMusicPlayback();
       return;
@@ -350,12 +362,18 @@ function HomeScreen({
     const requestId = musicRequestIdRef.current + 1;
     musicRequestIdRef.current = requestId;
     const audio = audioRef.current ?? new Audio();
+    const isSameSource = currentMusicSourceRef.current === option.src;
     audioRef.current = audio;
     audio.pause();
-    audio.src = option.src;
+    if (!isSameSource) {
+      audio.src = option.src;
+      currentMusicSourceRef.current = option.src;
+    }
     audio.loop = true;
     audio.volume = volumeForMusicOption(option);
-    audio.currentTime = 0;
+    if (restartFromBeginning || !isSameSource) {
+      audio.currentTime = 0;
+    }
 
     try {
       await audio.play();
@@ -368,6 +386,26 @@ function HomeScreen({
       }
       console.warn('Bubby music playback was blocked', error);
     }
+  }
+
+  function isDocumentVisible() {
+    return document.visibilityState !== 'hidden';
+  }
+
+  async function startMusicPlaybackIfVisible(option: MusicOption) {
+    if (!option.src || !isDocumentVisible()) {
+      return;
+    }
+
+    await startMusicPlayback(option);
+  }
+
+  async function resumeMusicPlaybackIfVisible(option: MusicOption) {
+    if (!option.src || !isDocumentVisible()) {
+      return;
+    }
+
+    await startMusicPlayback(option, false);
   }
 
   function musicOptionAriaLabel(option: MusicOption): string {
@@ -466,6 +504,10 @@ function HomeScreen({
   }, [animationState.currentAnimation, isControlledChat]);
 
   useEffect(() => {
+    activeMusicOptionRef.current = activeMusicOption;
+  }, [activeMusicOption]);
+
+  useEffect(() => {
     return () => {
       clearRolloutInterval();
       clearIdleSpinTimeout();
@@ -527,6 +569,39 @@ function HomeScreen({
     };
   }, [isThemePickerOpen]);
 
+  useEffect(() => {
+    if (isControlledChat) {
+      return undefined;
+    }
+
+    function handleMusicVisibilityChange() {
+      if (document.visibilityState === 'hidden') {
+        pauseMusicForBackground();
+        return;
+      }
+
+      void resumeMusicPlaybackIfVisible(activeMusicOptionRef.current);
+    }
+
+    function handleMusicPageHide() {
+      pauseMusicForBackground();
+    }
+
+    function handleMusicPageShow() {
+      void resumeMusicPlaybackIfVisible(activeMusicOptionRef.current);
+    }
+
+    document.addEventListener('visibilitychange', handleMusicVisibilityChange);
+    window.addEventListener('pagehide', handleMusicPageHide);
+    window.addEventListener('pageshow', handleMusicPageShow);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleMusicVisibilityChange);
+      window.removeEventListener('pagehide', handleMusicPageHide);
+      window.removeEventListener('pageshow', handleMusicPageShow);
+    };
+  }, [isControlledChat]);
+
   function applyTheme(themeId: string) {
     setActiveThemeState(saveActiveTheme(themeId));
     setIsThemePickerOpen(false);
@@ -535,13 +610,14 @@ function HomeScreen({
   function applyMusicOption(musicId: string) {
     const nextMusicOption = setActiveMusicOption(musicId);
     setActiveMusicOptionState(nextMusicOption);
+    activeMusicOptionRef.current = nextMusicOption;
 
     if (!nextMusicOption.src) {
       stopMusicPlayback();
       return;
     }
 
-    void startMusicPlayback(nextMusicOption);
+    void startMusicPlaybackIfVisible(nextMusicOption);
   }
 
   function cycleBubbyColor() {

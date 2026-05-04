@@ -69,6 +69,61 @@ test('home screen extends the hamburger menu with music controls', () => {
   assert.match(source, /musicNotesActive/);
 });
 
+test('home screen pauses music for background without muting the saved option', () => {
+  assert.match(source, /function pauseMusicForBackground\(\)/);
+  const pauseStart = source.indexOf('function pauseMusicForBackground()');
+  const pauseEnd = source.indexOf('async function startMusicPlayback', pauseStart);
+  const pauseBlock = source.slice(pauseStart, pauseEnd);
+
+  assert.ok(pauseStart >= 0);
+  assert.match(pauseBlock, /audio\.pause\(\)/);
+  assert.match(pauseBlock, /setIsMusicPlaying\(false\)/);
+  assert.doesNotMatch(pauseBlock, /currentTime\s*=\s*0/);
+  assert.doesNotMatch(pauseBlock, /setActiveMusicOption\('mute'\)/);
+});
+
+test('home screen starts playable music only while the document is visible', () => {
+  assert.match(source, /function isDocumentVisible\(\)/);
+  assert.match(source, /document\.visibilityState !== 'hidden'/);
+  assert.match(source, /function startMusicPlaybackIfVisible\(option: MusicOption\)/);
+  assert.match(source, /function resumeMusicPlaybackIfVisible\(option: MusicOption\)/);
+  assert.match(source, /if \(!option\.src \|\| !isDocumentVisible\(\)\) \{/);
+  assert.match(source, /void startMusicPlaybackIfVisible\(nextMusicOption\)/);
+  assert.match(source, /await startMusicPlayback\(option, false\)/);
+  assert.doesNotMatch(source, /void startMusicPlayback\(nextMusicOption\)/);
+});
+
+test('home screen handles page visibility lifecycle for music only in home mode', () => {
+  const listenerIndex = source.indexOf("document.addEventListener('visibilitychange', handleMusicVisibilityChange)");
+  const visibilityStart = source.lastIndexOf('useEffect(() => {', listenerIndex);
+  const visibilityEnd = source.indexOf('function applyTheme', visibilityStart);
+  const visibilityBlock = source.slice(visibilityStart, visibilityEnd);
+
+  assert.ok(visibilityStart >= 0);
+  assert.match(visibilityBlock, /if \(isControlledChat\) \{\s*return undefined;\s*\}/);
+  assert.match(visibilityBlock, /document\.addEventListener\('visibilitychange', handleMusicVisibilityChange\)/);
+  assert.match(visibilityBlock, /window\.addEventListener\('pagehide', handleMusicPageHide\)/);
+  assert.match(visibilityBlock, /window\.addEventListener\('pageshow', handleMusicPageShow\)/);
+  assert.match(visibilityBlock, /document\.removeEventListener\('visibilitychange', handleMusicVisibilityChange\)/);
+  assert.match(visibilityBlock, /window\.removeEventListener\('pagehide', handleMusicPageHide\)/);
+  assert.match(visibilityBlock, /window\.removeEventListener\('pageshow', handleMusicPageShow\)/);
+  assert.match(visibilityBlock, /pauseMusicForBackground\(\)/);
+  assert.match(visibilityBlock, /resumeMusicPlaybackIfVisible\(activeMusicOptionRef\.current\)/);
+});
+
+test('home screen keeps manual mute separate from background pause and music notes track playback', () => {
+  const applyStart = source.indexOf('function applyMusicOption(musicId: string)');
+  const applyEnd = source.indexOf('function cycleBubbyColor', applyStart);
+  const applyBlock = source.slice(applyStart, applyEnd);
+
+  assert.ok(applyStart >= 0);
+  assert.match(applyBlock, /setActiveMusicOption\(musicId\)/);
+  assert.match(applyBlock, /if \(!nextMusicOption\.src\) \{\s*stopMusicPlayback\(\);\s*return;\s*\}/);
+  assert.doesNotMatch(applyBlock, /pauseMusicForBackground\(\)/);
+  assert.match(source, /activeMusicOptionRef\.current = nextMusicOption/);
+  assert.match(source, /const areMusicNotesActive = activeMusicOption\.src !== null && isMusicPlaying;/);
+});
+
 test('home screen extends the hamburger menu with release info controls', () => {
   assert.match(source, /theme-picker-label">info/);
   assert.match(source, /setIsInfoPanelOpen\(true\)/);
