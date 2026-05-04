@@ -43,9 +43,10 @@ import {
 } from '../lib/dialogueRollout.ts';
 import {
   assertChatRequestWithinImageBudget,
+  ChatRequestError,
   estimateDataUrlBytes,
   ImageProcessingError,
-  imageUploadUserMessage,
+  photoSendUserMessage,
   processImagesForChatUpload,
   type ProcessedImage,
 } from '../lib/imageProcessing.ts';
@@ -70,6 +71,7 @@ import {
   getConversationHistory,
   getDailyLog,
   getUserProfile,
+  isConversationHistoryStorageError,
   setBubbyColorId,
   setBubbyState,
   type ChatMessage,
@@ -163,6 +165,14 @@ function errorForLog(error: unknown) {
       message: error.message,
       code: error.code,
       details: error.details,
+    };
+  }
+
+  if (error instanceof ChatRequestError) {
+    return {
+      name: error.name,
+      message: error.message,
+      status: error.status,
     };
   }
 
@@ -569,6 +579,35 @@ function HomeScreen({
     window.location.reload();
   }
 
+  function appendLocalHomeMessage(message: ChatMessage) {
+    setHomeMessages((currentMessages) =>
+      homeVisibleMessages([...currentMessages, message]),
+    );
+  }
+
+  function appendHomeMessage(
+    message: ChatMessage,
+    { persist = true }: { persist?: boolean } = {},
+  ): { persisted: boolean; error?: unknown } {
+    if (!persist) {
+      appendLocalHomeMessage(message);
+      return { persisted: false };
+    }
+
+    try {
+      const history = appendMessageToHistory(message);
+      setHomeMessages(homeVisibleMessages(history));
+      return { persisted: true };
+    } catch (error) {
+      if (isConversationHistoryStorageError(error)) {
+        appendLocalHomeMessage(message);
+        return { persisted: false, error };
+      }
+
+      throw error;
+    }
+  }
+
   async function sendHomeMessage() {
     const content = inputValue.trim();
     const imageFiles = attachedImageFiles.slice(0, 4);
@@ -594,21 +633,25 @@ function HomeScreen({
         is_onboarding: false,
       };
       assertChatRequestWithinImageBudget(requestBody);
-      const userHistory = appendMessageToHistory(
-        createMessage(
-          'user',
-          content,
-          processedImages[0]
-            ? {
-                thumbnail: processedImages[0].thumbnail,
-                thumbnails: processedImages.map((processedImage) => processedImage.thumbnail),
-                fullImages: processedImages.map((processedImage) => processedImage.fullImage),
-              }
-            : {},
-        ),
+      const userMessage = createMessage(
+        'user',
+        content,
+        processedImages[0]
+          ? {
+              thumbnail: processedImages[0].thumbnail,
+              thumbnails: processedImages.map((processedImage) => processedImage.thumbnail),
+            }
+          : {},
       );
+      const userPersistence = appendHomeMessage(userMessage);
 
-      setHomeMessages(homeVisibleMessages(userHistory));
+      if (userPersistence.error) {
+        logHomeChatError(userPersistence.error, imageFiles, processedImages);
+        appendHomeMessage(
+          createMessage('assistant', photoSendUserMessage(userPersistence.error, imageFiles.length > 0)),
+          { persist: false },
+        );
+      }
 
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -632,7 +675,7 @@ function HomeScreen({
           );
         }
 
-        throw new Error(body.error ?? 'chat request failed');
+        throw new ChatRequestError(response.status, body.error ?? 'chat request failed');
       }
 
       const visibleReply = stripActionEnvelopes(body.reply ?? '');
@@ -671,10 +714,13 @@ function HomeScreen({
 
       if (visibleReply) {
         const assistantMessage = createMessage('assistant', visibleReply);
-        const assistantHistory = appendMessageToHistory(
+        const assistantPersistence = appendHomeMessage(
           assistantMessage,
+          { persist: userPersistence.persisted },
         );
-        setHomeMessages(homeVisibleMessages(assistantHistory));
+        if (assistantPersistence.error) {
+          logHomeChatError(assistantPersistence.error, imageFiles, processedImages);
+        }
         await startReplyRollout(assistantMessage.id ?? assistantMessage.timestamp, visibleReply);
       }
 
@@ -687,10 +733,10 @@ function HomeScreen({
       clearRolloutInterval();
       setHomeRollingMessageId(null);
       setHomeRevealedLength(0);
-      const errorHistory = appendMessageToHistory(
-        createMessage('assistant', imageUploadUserMessage(error)),
+      appendHomeMessage(
+        createMessage('assistant', photoSendUserMessage(error, imageFiles.length > 0)),
+        { persist: !isConversationHistoryStorageError(error) },
       );
-      setHomeMessages(homeVisibleMessages(errorHistory));
     } finally {
       setIsSending(false);
     }

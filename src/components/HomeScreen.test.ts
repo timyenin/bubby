@@ -102,10 +102,33 @@ test('home screen uses action mutation metadata for vitals and filters skipped d
 
 test('home screen gives clearer photo upload failures without logging raw image data', () => {
   assert.match(source, /logHomeChatError\(error,\s*imageFiles,\s*processedImages\)/);
-  assert.match(source, /imageUploadUserMessage\(error\)/);
+  assert.match(source, /photoSendUserMessage\(error,\s*imageFiles\.length > 0\)/);
   assert.match(source, /response\.status === 413/);
   assert.match(source, /name:\s*file\.name/);
   assert.match(source, /size:\s*file\.size/);
   assert.match(source, /fullImageBytes:/);
   assert.doesNotMatch(source, /console\.error\([^)]*fullImage/);
+});
+
+test('home screen sends full processed images to Claude but stores only thumbnails', () => {
+  assert.match(source, /data:\s*dataUrlToBase64\(processedImage\.fullImage\)/);
+  assert.match(source, /thumbnails:\s*processedImages\.map\(\(processedImage\) => processedImage\.thumbnail\)/);
+  assert.doesNotMatch(source, /fullImages:\s*processedImages\.map/);
+});
+
+test('home screen keeps attachments on failed sends and clears them only after success', () => {
+  const successClearIndex = source.indexOf('if (processedImages.length > 0)');
+  const catchIndex = source.indexOf('} catch (error) {', successClearIndex);
+  const catchBlock = source.slice(catchIndex, source.indexOf('} finally {', catchIndex));
+
+  assert.ok(successClearIndex >= 0);
+  assert.match(source.slice(successClearIndex, catchIndex), /setAttachedImageFiles\(\[\]\)/);
+  assert.doesNotMatch(catchBlock, /setAttachedImageFiles\(\[\]\)/);
+  assert.doesNotMatch(catchBlock, /setAttachmentClearSignal/);
+});
+
+test('home screen handles conversation storage failures without retrying persistence forever', () => {
+  assert.match(source, /isConversationHistoryStorageError/);
+  assert.match(source, /appendHomeMessage/);
+  assert.match(source, /persist:\s*false/);
 });

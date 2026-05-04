@@ -6,7 +6,9 @@ const CONVERSATION_HISTORY_KEY = `${KEY_PREFIX}conversation_history`;
 const ONBOARDING_COMPLETE_KEY = `${KEY_PREFIX}onboarding_complete`;
 const MEMORY_KEY = `${KEY_PREFIX}memory`;
 const BUBBY_COLOR_KEY = `${KEY_PREFIX}bubby_color`;
-const MAX_HISTORY_MESSAGES = 100;
+const MAX_HISTORY_MESSAGES = 300;
+const MAX_PERSISTED_IMAGE_THUMBNAIL_MESSAGES = 10;
+const LAST_RESORT_HISTORY_MESSAGE_LIMITS = [250, 200, 150, 100, 75, 50, 40, 30, 20, 10, 1];
 const DEFAULT_BUBBY_COLOR_ID = 'default';
 const DUPLICATE_MEAL_WINDOW_MS = 3 * 60 * 1000;
 const MACRO_KEYS: Array<keyof MacroTotals> = ['calories', 'protein_g', 'carbs_g', 'fat_g'];
@@ -112,6 +114,22 @@ export interface ConversationHistory {
   messages: ChatMessage[];
 }
 
+export class ConversationHistoryStorageError extends Error {
+  readonly originalError?: unknown;
+
+  constructor(message: string, originalError?: unknown) {
+    super(message);
+    this.name = 'ConversationHistoryStorageError';
+    this.originalError = originalError;
+  }
+}
+
+export function isConversationHistoryStorageError(
+  error: unknown,
+): error is ConversationHistoryStorageError {
+  return error instanceof ConversationHistoryStorageError;
+}
+
 export interface MemoryEntry {
   id: string;
   content: string;
@@ -165,6 +183,140 @@ function clampVital(value: number): number {
 
 function timestampFrom(date = new Date()): string {
   return date.toISOString();
+}
+
+function sanitizedOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function sanitizedStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const strings = value.filter((item): item is string => (
+    typeof item === 'string' && item.length > 0
+  ));
+
+  return strings.length > 0 ? strings : undefined;
+}
+
+export function sanitizeChatMessageForStorage(message: ChatMessage): ChatMessage {
+  const sanitized: ChatMessage = {
+    role: message.role === 'assistant' ? 'assistant' : 'user',
+    content: typeof message.content === 'string' ? message.content : String(message.content ?? ''),
+    timestamp: typeof message.timestamp === 'string' ? message.timestamp : timestampFrom(),
+  };
+  const id = sanitizedOptionalString(message.id);
+  const thumbnail = sanitizedOptionalString(message.thumbnail);
+  const thumbnails = sanitizedStringArray(message.thumbnails);
+
+  if (id) {
+    sanitized.id = id;
+  }
+
+  if (thumbnail) {
+    sanitized.thumbnail = thumbnail;
+  }
+
+  if (thumbnails) {
+    sanitized.thumbnails = thumbnails;
+  }
+
+  return sanitized;
+}
+
+export function sanitizeConversationHistoryForStorage(
+  history: ConversationHistory | null | undefined,
+  messageLimit = MAX_HISTORY_MESSAGES,
+): ConversationHistory {
+  const messages = Array.isArray(history?.messages) ? history.messages : [];
+
+  return {
+    messages: messages
+      .map((message) => sanitizeChatMessageForStorage(message))
+      .slice(-messageLimit),
+  };
+}
+
+function messageHasPersistedImagePreview(message: ChatMessage): boolean {
+  return Boolean(message.thumbnail || (message.thumbnails && message.thumbnails.length > 0));
+}
+
+function withoutImagePreviews(message: ChatMessage): ChatMessage {
+  const { thumbnail, thumbnails, ...messageWithoutPreviews } = message;
+  return messageWithoutPreviews;
+}
+
+export function pruneConversationHistoryImagePayloads(
+  history: ConversationHistory,
+  keepRecentImageMessages = MAX_PERSISTED_IMAGE_THUMBNAIL_MESSAGES,
+): ConversationHistory {
+  const sanitizedHistory = sanitizeConversationHistoryForStorage(history);
+  const imageMessageIndexes = sanitizedHistory.messages
+    .map((message, index) => (messageHasPersistedImagePreview(message) ? index : -1))
+    .filter((index) => index >= 0);
+  const keptImageIndexes = new Set(
+    imageMessageIndexes.slice(-Math.max(0, keepRecentImageMessages)),
+  );
+
+  return {
+    messages: sanitizedHistory.messages.map((message, index) => (
+      keptImageIndexes.has(index) ? message : withoutImagePreviews(message)
+    )),
+  };
+}
+
+function uniqueConversationHistoryCandidates(
+  candidates: ConversationHistory[],
+): ConversationHistory[] {
+  const seen = new Set<string>();
+
+  return candidates.filter((candidate) => {
+    const key = JSON.stringify(candidate);
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function conversationHistoryStorageCandidates(history: ConversationHistory): ConversationHistory[] {
+  const sanitizedHistory = sanitizeConversationHistoryForStorage(history);
+  const recentImagePreviewsOnly = pruneConversationHistoryImagePayloads(
+    sanitizedHistory,
+    MAX_PERSISTED_IMAGE_THUMBNAIL_MESSAGES,
+  );
+  const textOnlyHistory = pruneConversationHistoryImagePayloads(sanitizedHistory, 0);
+  const lastResortTextHistories = LAST_RESORT_HISTORY_MESSAGE_LIMITS.map((messageLimit) =>
+    sanitizeConversationHistoryForStorage(textOnlyHistory, messageLimit),
+  );
+
+  return uniqueConversationHistoryCandidates([
+    sanitizedHistory,
+    recentImagePreviewsOnly,
+    textOnlyHistory,
+    ...lastResortTextHistories,
+  ]);
+}
+
+function writeConversationHistoryWithFallback(history: ConversationHistory): ConversationHistory {
+  let lastError: unknown = null;
+
+  for (const candidate of conversationHistoryStorageCandidates(history)) {
+    try {
+      return setJson(CONVERSATION_HISTORY_KEY, candidate);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw new ConversationHistoryStorageError(
+    'Conversation history could not be saved.',
+    lastError,
+  );
 }
 
 function generateMemoryId(now: string): string {
@@ -421,11 +573,25 @@ export function deleteBubbyState(): void {
 }
 
 export function getConversationHistory(): ConversationHistory | null {
-  return getJson<ConversationHistory>(CONVERSATION_HISTORY_KEY);
+  const history = getJson<ConversationHistory>(CONVERSATION_HISTORY_KEY);
+  if (!history) {
+    return null;
+  }
+
+  const sanitizedHistory = sanitizeConversationHistoryForStorage(history);
+  if (JSON.stringify(history) !== JSON.stringify(sanitizedHistory)) {
+    try {
+      writeConversationHistoryWithFallback(sanitizedHistory);
+    } catch {
+      // Reads should remain usable even if storage is already over quota.
+    }
+  }
+
+  return sanitizedHistory;
 }
 
 export function setConversationHistory(history: ConversationHistory): ConversationHistory {
-  return setJson(CONVERSATION_HISTORY_KEY, history);
+  return writeConversationHistoryWithFallback(history);
 }
 
 export function deleteConversationHistory(): void {
@@ -560,11 +726,12 @@ export function updateMemoryEntry(
 }
 
 /**
- * Append a message to conversation history and keep only the latest 100.
+ * Append a message to conversation history and keep only the latest 300.
  */
 export function appendMessageToHistory(message: ChatMessage): ConversationHistory {
   const history = getConversationHistory() ?? { messages: [] };
-  const messages = [...history.messages, message].slice(-MAX_HISTORY_MESSAGES);
+  const messages = [...history.messages, sanitizeChatMessageForStorage(message)]
+    .slice(-MAX_HISTORY_MESSAGES);
   return setConversationHistory({ messages });
 }
 

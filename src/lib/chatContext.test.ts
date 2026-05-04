@@ -130,7 +130,7 @@ test('buildChatContext assembles the home chat payload shape', () => {
   assert.equal(context.memory, null);
 });
 
-test('buildChatContextFromStorage reads localStorage and caps recent history at 20', () => {
+test('buildChatContextFromStorage reads localStorage and caps recent history at 150', () => {
   setUserProfile(profile);
   setPantry({ items: [] });
   setDailyLog('2026-04-27', {
@@ -157,7 +157,7 @@ test('buildChatContextFromStorage reads localStorage and caps recent history at 
     last_updated: '2026-04-27T10:00:00.000Z',
   });
   setConversationHistory({
-    messages: Array.from({ length: 50 }, (_, index) => ({
+    messages: Array.from({ length: 170 }, (_, index) => ({
       role: index % 2 === 0 ? 'user' : 'assistant',
       content: `message ${index}`,
       timestamp: `2026-04-27T10:${String(index).padStart(2, '0')}:00.000Z`,
@@ -170,15 +170,96 @@ test('buildChatContextFromStorage reads localStorage and caps recent history at 
     now: new Date('2026-04-27T16:34:00.000Z'),
   });
 
-  assert.equal(context.recent_history.length, 20);
-  assert.equal(context.recent_history[0].content, 'message 30');
-  assert.equal(context.recent_history.at(-1).content, 'message 49');
+  assert.equal(context.recent_history.length, 150);
+  assert.equal(context.recent_history[0].content, 'message 20');
+  assert.equal(context.recent_history.at(-1).content, 'message 169');
   assert.deepEqual(context.macros_today, {
     calories: 100,
     protein_g: 10,
     carbs_g: 12,
     fat_g: 3,
   });
+});
+
+test('buildChatContext keeps a 50-message meal-planning thread in recent history', () => {
+  setConversationHistory({
+    messages: Array.from({ length: 50 }, (_, index) => ({
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      content: `meal planning detail ${index}`,
+      timestamp: `2026-04-27T10:${String(index).padStart(2, '0')}:00.000Z`,
+    })),
+  });
+
+  const context = buildChatContextFromStorage({
+    dateString: '2026-04-27',
+    currentTime: '2026-04-27T16:34:00.000Z',
+    now: new Date('2026-04-27T16:34:00.000Z'),
+  });
+
+  assert.equal(context.recent_history.length, 50);
+  assert.equal(context.recent_history[0].content, 'meal planning detail 0');
+  assert.equal(context.recent_history.at(-1).content, 'meal planning detail 49');
+});
+
+test('recent history is text-only and excludes image payload fields', () => {
+  setConversationHistory({
+    messages: [
+      {
+        role: 'user',
+        content: 'photo lunch',
+        timestamp: '2026-04-27T10:00:00.000Z',
+        thumbnail: 'data:image/jpeg;base64,thumb',
+        thumbnails: ['data:image/jpeg;base64,thumb'],
+        fullImages: ['data:image/jpeg;base64,full-image'],
+      },
+      {
+        role: 'assistant',
+        content: 'logged.',
+        timestamp: '2026-04-27T10:01:00.000Z',
+      },
+    ],
+  });
+
+  const context = buildChatContextFromStorage({
+    dateString: '2026-04-27',
+    currentTime: '2026-04-27T16:34:00.000Z',
+    now: new Date('2026-04-27T16:34:00.000Z'),
+  });
+
+  assert.deepEqual(context.recent_history, [
+    { role: 'user', content: 'photo lunch' },
+    { role: 'assistant', content: 'logged.' },
+  ]);
+  assert.equal(context.recent_history.every((message) => Object.keys(message).join(',') === 'role,content'), true);
+  assert.doesNotMatch(JSON.stringify(context.recent_history), /thumbnail|fullImages|full-image|base64/);
+});
+
+test('recent history respects a character budget while preferring newest chronological messages', () => {
+  setConversationHistory({
+    messages: Array.from({ length: 70 }, (_, index) => ({
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      content: `budgeted message ${index} ${'x'.repeat(1000)}`,
+      timestamp: `2026-04-27T10:${String(index).padStart(2, '0')}:00.000Z`,
+    })),
+  });
+
+  const context = buildChatContextFromStorage({
+    dateString: '2026-04-27',
+    currentTime: '2026-04-27T16:34:00.000Z',
+    now: new Date('2026-04-27T16:34:00.000Z'),
+  });
+  const totalCharacters = context.recent_history.reduce(
+    (total, message) => total + message.role.length + message.content.length,
+    0,
+  );
+
+  assert.ok(context.recent_history.length > 20);
+  assert.ok(context.recent_history.length < 70);
+  assert.ok(totalCharacters <= 50000);
+  assert.equal(context.recent_history.at(-1).content.startsWith('budgeted message 69'), true);
+  const retainedIndexes = context.recent_history.map((message) => Number(message.content.match(/budgeted message (\d+)/)[1]));
+  assert.ok(retainedIndexes[0] > 0);
+  assert.deepEqual(retainedIndexes, retainedIndexes.toSorted((a, b) => a - b));
 });
 
 test('buildChatContextFromStorage includes canonical today meals and macro deltas', () => {

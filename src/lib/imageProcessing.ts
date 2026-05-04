@@ -1,3 +1,5 @@
+import { isConversationHistoryStorageError } from './storage.ts';
+
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 export const CLIENT_CHAT_REQUEST_BODY_BUDGET_BYTES = Math.floor(3.5 * 1024 * 1024);
 export const MAX_PROCESSED_IMAGE_BYTES = 900 * 1024;
@@ -46,6 +48,16 @@ export class ImageProcessingError extends Error {
     this.code = code;
     this.userMessage = USER_MESSAGES[code];
     this.details = details;
+  }
+}
+
+export class ChatRequestError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ChatRequestError';
+    this.status = status;
   }
 }
 
@@ -332,6 +344,65 @@ export function imageUploadUserMessage(error: unknown): string {
   return isImageProcessingError(error)
     ? error.userMessage
     : 'something glitched. try again?';
+}
+
+function isChatRequestError(error: unknown): error is ChatRequestError {
+  return error instanceof ChatRequestError;
+}
+
+function isQuotaOrStorageLikeError(error: unknown): boolean {
+  if (isConversationHistoryStorageError(error)) {
+    return true;
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return /quota|storage|localStorage/i.test(`${error.name} ${error.message}`);
+}
+
+function isNetworkLikeError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error instanceof TypeError ||
+    /network|fetch|load failed|failed to fetch|connection/i.test(`${error.name} ${error.message}`)
+  );
+}
+
+export function photoSendUserMessage(error: unknown, hasAttachment: boolean): string {
+  if (isImageProcessingError(error)) {
+    return error.userMessage;
+  }
+
+  if (hasAttachment && isQuotaOrStorageLikeError(error)) {
+    return 'my photo memory got too full. i cleaned it up — try sending that again?';
+  }
+
+  if (isChatRequestError(error)) {
+    if (error.status === 413) {
+      return 'photo upload was too big. try one photo at a time?';
+    }
+
+    if (hasAttachment && error.status === 400) {
+      return 'i couldn’t read that image. try a screenshot or jpg/png?';
+    }
+
+    if (hasAttachment && error.status >= 500) {
+      return 'my photo brain hiccuped. try that one again?';
+    }
+  }
+
+  if (hasAttachment && isNetworkLikeError(error)) {
+    return 'connection glitched while sending the photo. try again?';
+  }
+
+  return hasAttachment
+    ? 'photo send glitched. try that one again?'
+    : imageUploadUserMessage(error);
 }
 
 /**

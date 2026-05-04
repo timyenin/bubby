@@ -4,12 +4,15 @@ import test from 'node:test';
 
 import {
   assertChatRequestWithinImageBudget,
+  ChatRequestError,
   CLIENT_CHAT_REQUEST_BODY_BUDGET_BYTES,
   ImageProcessingError,
   MAX_UPLOAD_BYTES,
+  photoSendUserMessage,
   processImageForUpload,
   processImagesForChatUpload,
 } from './imageProcessing.ts';
+import { ConversationHistoryStorageError } from './storage.ts';
 
 function createImageFile(overrides = {}) {
   return {
@@ -206,5 +209,39 @@ test('assertChatRequestWithinImageBudget rejects oversized image request bodies 
       error instanceof ImageProcessingError &&
       error.code === 'request-payload-too-large'
     ),
+  );
+});
+
+test('photo send user messages classify non-image failures for attached photos', () => {
+  assert.equal(
+    photoSendUserMessage(
+      new ConversationHistoryStorageError('conversation history could not be saved', new DOMException('quota', 'QuotaExceededError')),
+      true,
+    ),
+    'my photo memory got too full. i cleaned it up — try sending that again?',
+  );
+  assert.equal(
+    photoSendUserMessage(new TypeError('Failed to fetch'), true),
+    'connection glitched while sending the photo. try again?',
+  );
+  assert.equal(
+    photoSendUserMessage(new ChatRequestError(413, 'request body is too large'), true),
+    'photo upload was too big. try one photo at a time?',
+  );
+  assert.equal(
+    photoSendUserMessage(new ChatRequestError(400, 'valid image is required'), true),
+    'i couldn’t read that image. try a screenshot or jpg/png?',
+  );
+  assert.equal(
+    photoSendUserMessage(new ChatRequestError(500, 'Claude API request failed'), true),
+    'my photo brain hiccuped. try that one again?',
+  );
+  assert.equal(
+    photoSendUserMessage(new Error('mystery'), true),
+    'photo send glitched. try that one again?',
+  );
+  assert.equal(
+    photoSendUserMessage(new Error('mystery'), false),
+    'something glitched. try again?',
   );
 });

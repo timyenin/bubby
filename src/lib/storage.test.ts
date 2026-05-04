@@ -12,11 +12,13 @@ import {
   getMemory,
   getBubbyColorId,
   getCanonicalDailyLog,
+  getConversationHistory,
   deleteUserProfile,
   getDailyLog,
   getOnboardingComplete,
   getOrInitCanonicalDailyLog,
   getOrInitDailyLog,
+  getPantry,
   getUserProfile,
   incrementVital,
   normalizeMacroTotals,
@@ -25,9 +27,11 @@ import {
   removeMemoryEntry,
   setBubbyState,
   setBubbyColorId,
+  setConversationHistory,
   setDailyLog,
   setMemory,
   setOnboardingComplete,
+  setPantry,
   setUserProfile,
   sumMealTotals,
   updateMemoryEntry,
@@ -52,12 +56,43 @@ class MemoryStorage {
     this.#items.set(key, String(value));
   }
 
+  seedItem(key, value) {
+    this.#items.set(key, String(value));
+  }
+
   removeItem(key) {
     this.#items.delete(key);
   }
 
   clear() {
     this.#items.clear();
+  }
+}
+
+const CONVERSATION_HISTORY_KEY = 'bubby:conversation_history';
+
+class RejectingFullImageStorage extends MemoryStorage {
+  setItem(key, value) {
+    if (key === CONVERSATION_HISTORY_KEY && String(value).includes('full-image')) {
+      throw new DOMException('quota blocked full image payload', 'QuotaExceededError');
+    }
+
+    super.setItem(key, value);
+  }
+}
+
+class LimitedConversationStorage extends MemoryStorage {
+  constructor(maxConversationBytes) {
+    super();
+    this.maxConversationBytes = maxConversationBytes;
+  }
+
+  setItem(key, value) {
+    if (key === CONVERSATION_HISTORY_KEY && new TextEncoder().encode(String(value)).length > this.maxConversationBytes) {
+      throw new DOMException('quota exceeded', 'QuotaExceededError');
+    }
+
+    super.setItem(key, value);
   }
 }
 
@@ -122,8 +157,8 @@ test('getOrInitDailyLog returns and persists an empty log when none exists', () 
   assert.deepEqual(getDailyLog('2026-04-26'), log);
 });
 
-test('appendMessageToHistory caps conversation history at 100 messages', () => {
-  for (let index = 0; index < 105; index += 1) {
+test('appendMessageToHistory caps conversation history at 300 messages', () => {
+  for (let index = 0; index < 305; index += 1) {
     appendMessageToHistory({
       role: index % 2 === 0 ? 'user' : 'assistant',
       content: `message ${index}`,
@@ -137,12 +172,12 @@ test('appendMessageToHistory caps conversation history at 100 messages', () => {
     timestamp: '2026-04-26T14:00:00-04:00',
   });
 
-  assert.equal(history.messages.length, 100);
+  assert.equal(history.messages.length, 300);
   assert.equal(history.messages[0].content, 'message 6');
   assert.equal(history.messages.at(-1).content, 'latest');
 });
 
-test('appendMessageToHistory persists optional image data on messages', () => {
+test('appendMessageToHistory persists only thumbnails for image messages', () => {
   const thumbnail = 'data:image/jpeg;base64,small-thumb';
   const thumbnails = [
     'data:image/jpeg;base64,small-thumb-1',
@@ -169,8 +204,177 @@ test('appendMessageToHistory persists optional image data on messages', () => {
     timestamp: '2026-04-28T12:00:00-04:00',
     thumbnail,
     thumbnails,
-    fullImages,
   });
+  assert.equal('fullImages' in history.messages[0], false);
+  assert.doesNotMatch(globalThis.localStorage.getItem(CONVERSATION_HISTORY_KEY), /full-image/);
+});
+
+test('getConversationHistory prunes old persisted fullImages without touching other storage keys', () => {
+  setUserProfile({ name: 'Tim' });
+  setPantry({ items: [{ name: 'rice', category: 'carb', always: true }] });
+  setDailyLog('2026-04-28', {
+    date: '2026-04-28',
+    is_workout_day: false,
+    meals: [],
+    totals: { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 },
+    adherence_flags: [],
+  });
+  setMemory({
+    entries: [{ id: 'memory_1', content: 'likes rice', category: 'preference' }],
+    last_updated: '2026-04-28T12:00:00.000Z',
+  });
+  const dailyLogBefore = globalThis.localStorage.getItem('bubby:daily_log:2026-04-28');
+  const memoryBefore = globalThis.localStorage.getItem('bubby:memory');
+
+  globalThis.localStorage.seedItem(CONVERSATION_HISTORY_KEY, JSON.stringify({
+    messages: [
+      {
+        id: 'message_1',
+        role: 'user',
+        content: 'lunch',
+        timestamp: '2026-04-28T12:00:00.000Z',
+        thumbnail: 'data:image/jpeg;base64,thumb-1',
+        thumbnails: ['data:image/jpeg;base64,thumb-1', 'data:image/jpeg;base64,thumb-2'],
+        fullImages: ['data:image/jpeg;base64,full-image-1'],
+      },
+      {
+        id: 'message_2',
+        role: 'assistant',
+        content: 'logged it.',
+        timestamp: '2026-04-28T12:01:00.000Z',
+      },
+    ],
+  }));
+
+  const history = getConversationHistory();
+
+  assert.deepEqual(history.messages.map((message) => message.id), ['message_1', 'message_2']);
+  assert.deepEqual(history.messages[0].thumbnails, ['data:image/jpeg;base64,thumb-1', 'data:image/jpeg;base64,thumb-2']);
+  assert.equal('fullImages' in history.messages[0], false);
+  assert.doesNotMatch(globalThis.localStorage.getItem(CONVERSATION_HISTORY_KEY), /full-image/);
+  assert.equal(globalThis.localStorage.getItem('bubby:daily_log:2026-04-28'), dailyLogBefore);
+  assert.equal(globalThis.localStorage.getItem('bubby:memory'), memoryBefore);
+  assert.deepEqual(getPantry(), { items: [{ name: 'rice', category: 'carb', always: true }] });
+});
+
+test('conversation history write retries with sanitized history when fullImages exceed quota', () => {
+  globalThis.localStorage = new RejectingFullImageStorage();
+
+  const history = appendMessageToHistory({
+    role: 'user',
+    content: 'photo',
+    timestamp: '2026-04-28T12:00:00.000Z',
+    thumbnail: 'data:image/jpeg;base64,thumb',
+    fullImages: ['data:image/jpeg;base64,full-image'],
+  });
+
+  assert.equal(history.messages.length, 1);
+  assert.equal(history.messages[0].thumbnail, 'data:image/jpeg;base64,thumb');
+  assert.equal('fullImages' in history.messages[0], false);
+  assert.doesNotMatch(globalThis.localStorage.getItem(CONVERSATION_HISTORY_KEY), /full-image/);
+});
+
+test('conversation history quota recovery prunes old image thumbnails before trimming text history', () => {
+  const textMessages = Array.from({ length: 50 }, (_, index) => ({
+    role: index % 2 === 0 ? 'user' : 'assistant',
+    content: `meal planning step ${index}`,
+    timestamp: `2026-04-28T10:${String(index).padStart(2, '0')}:00.000Z`,
+  }));
+  const imageMessages = Array.from({ length: 12 }, (_, index) => ({
+    role: 'user',
+    content: `photo ${index}`,
+    timestamp: `2026-04-28T11:${String(index).padStart(2, '0')}:00.000Z`,
+    thumbnail: `data:image/jpeg;base64,old-image-thumb-${index}-${'x'.repeat(180)}`,
+    thumbnails: [`data:image/jpeg;base64,old-image-thumb-${index}-${'x'.repeat(180)}`],
+  }));
+  const candidateWithOnlyRecentImageThumbnails = {
+    messages: [...textMessages, ...imageMessages, {
+      role: 'assistant',
+      content: 'latest',
+      timestamp: '2026-04-28T12:00:00.000Z',
+    }].map((message, index, messages) => {
+      const recentImageStart = messages.length - 1 - 10;
+      if (!message.thumbnail || index >= recentImageStart) {
+        return message;
+      }
+
+      const { thumbnail, thumbnails, ...rest } = message;
+      return rest;
+    }),
+  };
+  globalThis.localStorage = new LimitedConversationStorage(
+    new TextEncoder().encode(JSON.stringify(candidateWithOnlyRecentImageThumbnails)).length + 20,
+  );
+  globalThis.localStorage.seedItem(CONVERSATION_HISTORY_KEY, JSON.stringify({ messages: [...textMessages, ...imageMessages] }));
+
+  const history = appendMessageToHistory({
+    role: 'assistant',
+    content: 'latest',
+    timestamp: '2026-04-28T12:00:00.000Z',
+  });
+  const raw = globalThis.localStorage.getItem(CONVERSATION_HISTORY_KEY);
+
+  assert.equal(history.messages.filter((message) => message.content.startsWith('meal planning step')).length, 50);
+  assert.match(raw, /meal planning step 0/);
+  assert.doesNotMatch(raw, /old-image-thumb-0/);
+  assert.match(raw, /old-image-thumb-11/);
+});
+
+test('conversation history trims text only after all image thumbnails are removed', () => {
+  const textMessages = Array.from({ length: 80 }, (_, index) => ({
+    role: index % 2 === 0 ? 'user' : 'assistant',
+    content: `long planning message ${index} ${'x'.repeat(80)}`,
+    timestamp: `2026-04-28T10:${String(index).padStart(2, '0')}:00.000Z`,
+  }));
+  const imageMessages = Array.from({ length: 4 }, (_, index) => ({
+    role: 'user',
+    content: `photo ${index}`,
+    timestamp: `2026-04-28T11:${String(index).padStart(2, '0')}:00.000Z`,
+    thumbnail: `data:image/jpeg;base64,thumb-${index}-${'y'.repeat(800)}`,
+    thumbnails: [`data:image/jpeg;base64,thumb-${index}-${'y'.repeat(800)}`],
+  }));
+  const noImagePayloadMessages = [...textMessages, ...imageMessages, {
+    role: 'assistant',
+    content: 'latest',
+    timestamp: '2026-04-28T12:00:00.000Z',
+  }].map((message) => {
+    const { thumbnail, thumbnails, ...rest } = message;
+    return rest;
+  });
+  const lastResortMessages = noImagePayloadMessages.slice(-40);
+  globalThis.localStorage = new LimitedConversationStorage(
+    new TextEncoder().encode(JSON.stringify({ messages: lastResortMessages })).length + 20,
+  );
+  globalThis.localStorage.seedItem(CONVERSATION_HISTORY_KEY, JSON.stringify({ messages: [...textMessages, ...imageMessages] }));
+
+  const history = appendMessageToHistory({
+    role: 'assistant',
+    content: 'latest',
+    timestamp: '2026-04-28T12:00:00.000Z',
+  });
+  const raw = globalThis.localStorage.getItem(CONVERSATION_HISTORY_KEY);
+
+  assert.equal(raw.includes('data:image/jpeg;base64,thumb-'), false);
+  assert.equal(history.messages.at(-1).content, 'latest');
+  assert.ok(history.messages.length < noImagePayloadMessages.length);
+});
+
+test('setConversationHistory persists 300 text messages without fullImages', () => {
+  const messages = Array.from({ length: 300 }, (_, index) => ({
+    role: index % 2 === 0 ? 'user' : 'assistant',
+    content: `message ${index}`,
+    timestamp: `2026-04-28T10:${String(index).padStart(2, '0')}:00.000Z`,
+    fullImages: [`data:image/jpeg;base64,full-image-${index}`],
+  }));
+
+  const history = setConversationHistory({ messages });
+  const raw = globalThis.localStorage.getItem(CONVERSATION_HISTORY_KEY);
+
+  assert.equal(history.messages.length, 300);
+  assert.equal(history.messages[0].content, 'message 0');
+  assert.equal(history.messages.at(-1).content, 'message 299');
+  assert.equal(history.messages.some((message) => 'fullImages' in message), false);
+  assert.doesNotMatch(raw, /full-image/);
 });
 
 test('normalizeMacroTotals rounds calories and macro grams safely', () => {

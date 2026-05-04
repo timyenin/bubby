@@ -25,7 +25,8 @@ import {
   type UserProfile,
 } from './storage.ts';
 
-const RECENT_HISTORY_LIMIT = 20;
+const RECENT_HISTORY_LIMIT = 150;
+const RECENT_HISTORY_CHARACTER_BUDGET = 50_000;
 const MACRO_KEYS: Array<keyof MacroTotals> = ['calories', 'protein_g', 'carbs_g', 'fat_g'];
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const SHORT_WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -100,14 +101,33 @@ function compactHistory(
   conversationHistory: ConversationHistory | null | undefined,
 ): CompactHistoryMessage[] {
   const messages = conversationHistory?.messages ?? [];
+  const retainedMessages: CompactHistoryMessage[] = [];
+  let retainedCharacters = 0;
 
-  return messages
-    .slice(-RECENT_HISTORY_LIMIT)
-    .filter((message) => message?.content)
-    .map((message) => ({
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message?.content || message.content.trim() === '') {
+      continue;
+    }
+
+    const compactMessage = {
       role: message.role === 'user' ? 'user' : 'assistant',
       content: message.content,
-    }));
+    } satisfies CompactHistoryMessage;
+    const messageCharacters = compactMessage.role.length + compactMessage.content.length;
+
+    if (
+      retainedMessages.length >= RECENT_HISTORY_LIMIT ||
+      retainedCharacters + messageCharacters > RECENT_HISTORY_CHARACTER_BUDGET
+    ) {
+      break;
+    }
+
+    retainedMessages.push(compactMessage);
+    retainedCharacters += messageCharacters;
+  }
+
+  return retainedMessages.reverse();
 }
 
 function getTargetForDay(
